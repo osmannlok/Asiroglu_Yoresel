@@ -205,7 +205,5 @@ carts tablosu yalnızca giriş yapmış kullanıcıların sepetleri için kullan
 
 ## Sıradaki Adım
 
-- `CLAUDE.md` dosyasının düzeltilmesi.
-- Ardından `app/Views/home/index.php` dosyasının düzeltilmesi.
-- Ardından `database/migrate.php` dosyasının oluşturulması.
+
 - Ardından `database/migrations/010_create_coupons.sql` dosyasının oluşturulması.
