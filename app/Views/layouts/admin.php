@@ -39,6 +39,7 @@ $menuItems = [
     'dashboard'  => ['Genel Bakış', '/admin', false],
     'categories' => ['Kategoriler', '/admin/kategoriler', false],
     'brands'     => ['Markalar', '/admin/markalar', false],
+    'products'   => ['Ürünler', '/admin/urunler', false],
 ];
 
 // Flash bildirimleri: tür => Bootstrap alert sınıfı

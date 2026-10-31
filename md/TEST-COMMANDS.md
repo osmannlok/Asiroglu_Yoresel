@@ -42,6 +42,13 @@ php -l app/Views/admin/dashboard/index.php
 php -l app/Views/admin/categories/index.php
 php -l app/Views/admin/categories/form.php
 php -l app/Views/admin/brands/index.php
+php -l app/Views/admin/brands/form.php
+php -l app/Models/Product.php
+php -l app/Controllers/Admin/ProductController.php
+php -l app/Views/admin/products/index.php
+php -l app/Views/admin/products/form.php
+php -l app/Core/Uploader.php
+php -l app/Models/ProductImage.php
 
 ### Tüm PHP dosyalarını tek seferde tara
 
@@ -54,9 +61,6 @@ bu dosya için sözdizimi kontrolü atlanır veya kullanıcı kendisi çalışt�
 
 - Uygulanan migration'lar 001–018'dir (migrate.php yazıldı).
 
-Beklenen durum:
-- Uygulanan migration'lar 001–009'dur (migration 010 yazılana kadar).
-- Başarıyla çalışan her dosya `schema_migrations` tablosuna kaydedilir ve tekrar çalıştırılmaz.
 
 ## Veritabanı Kontrolü
 
@@ -102,9 +106,22 @@ git rm --cached <dosya>
 
 ## Elle Test: Admin Akışı
 
+Ön koşul: `app/Core/Auth.php` yerinde olmalı (`mv app/Models/Auth.php app/Core/Auth.php`) ve
+`app/Middleware/AuthMiddleware.php` silinmiş olmalı. Aksi halde `/admin` 500 verir.
+
 1. Girişsiz `/admin` → `/admin/giris`'e yönlendirir
 2. Admin ile giriş → `/admin` açılır; kategori/marka sayaçları görünür
 3. Müşteri hesabıyla `/admin/giris` → "E-posta veya şifre hatalı."
 4. Kategori: ekle, aynı slug ile ikinci kayıt (hata), düzenle (kendi slug'ı hata vermemeli), alt kategorili kategoriyi sil (reddedilmeli)
-5. Marka: aynı akış; `javascript:` ile başlayan web sitesi reddedilmeli
-6. CSRF'siz POST → 419
+5. Marka: `/admin/markalar` → ekle; aynı slug (hata); düzenle (kendi slug'ı hata vermemeli); web sitesine `javascript:alert(1)` (reddedilmeli); ürünü olmayan markayı sil (onay modalı)
+6. Ürün: en az bir kategori varken `/admin/urunler/olustur`
+   - Aynı SKU ile ikinci ürün (hata)
+   - Aynı slug (hata); slug boşken addan üretilmeli, çakışınca `-2` eklenmeli
+   - İndirimli fiyat ≥ satış fiyatı (hata)
+   - İndirim bitişi başlangıçtan önce (hata)
+   - Fiyata `850,50` yaz (reddedilmeli), `850.50` (kabul)
+   - Düzenlemede stok alanı görünmemeli, kritik eşik değişebilmeli
+   - Listede arama (ad ve SKU), kategori ve durum filtresi, sayfalamada filtrelerin korunması
+   - Stok 0 → "Tükendi", stok ≤ eşik → "Kritik" rozeti
+   - Ürünü sil (onay modalı, listeden kalkmalı)
+7. CSRF'siz POST → 419

@@ -214,7 +214,7 @@ Planlanan 31 uygulama tablosu:
 
 ## Sepet ve Sipariş Kuralları
 
-- Misafir sepeti yalnızca PHP session'da tutulur (`$_SESSION['cart']`); veritabanına carts/cart_items kaydı açılmaz.
+
 - `carts` yalnızca giriş yapmış kullanıcılar içindir; `carts.user_id` NOT NULL'dır. `carts.session_id` rezerve alandır, kullanılmaz.
 - Giriş yapınca session sepeti kullanıcının DB sepetiyle transaction içinde birleştirilir (aynı ürün+varyantta adetler toplanır, stok sınırı aşılmaz).
 - Kullanıcı giriş yaptığında misafir sepeti üye sepetiyle birleştirilir.
@@ -341,9 +341,9 @@ Claude aşağıdaki sırayı takip edecektir:
 
 1. MVC çekirdek altyapısı (tamamlandı)
 2. Veritabanı migration dosyaları (001–018 tamamlandı)
-3. Kategori ve marka yönetimi (controller ve index view'ları tamamlandı; marka form view'ı ve marka route'ları bekliyor).
-4. Ürün yönetimi
-5. Ürün görselleri ve varyantlar
+3. Kategori ve marka yönetimi (tamamlandı; görsel/logo alanları Uploader ile sonra eklenecek)
+4. Ürün yönetimi (model, controller, liste ve form view'ları tamamlandı)
+5. Ürün görselleri ve varyantlar (Uploader ve ProductImage modeli tamamlandı; görsel controller'ı ve varyantlar bekliyor)
 6. Stok yönetimi
 7. Admin paneli
 8. Sepet modülü

@@ -12,8 +12,10 @@ declare(strict_types=1);
 namespace App\Core;
 
 use App\Controllers\Admin\AuthController as AdminAuthController;
+use App\Controllers\Admin\BrandController;
 use App\Controllers\Admin\CategoryController;
 use App\Controllers\Admin\DashboardController;
+use App\Controllers\Admin\ProductController;
 use App\Controllers\HomeController;
 use App\Middleware\AdminMiddleware;
 use Throwable;
@@ -95,7 +97,7 @@ final class App
         $this->router->post('/admin/cikis', [AdminAuthController::class, 'logout']);
 
         // --- Yönetim paneli: korumalı route'lar -----------------------------
-        // Marka, ürün vb. yeni admin route'ları bu grubun İÇİNE eklenir.
+        // Yeni admin route'ları (stok, sipariş vb.) bu grubun İÇİNE eklenir.
         // Grup içindeki yollar "/admin" önekiyle birleşir ('/' => '/admin').
         $this->router->group(
             ['prefix' => '/admin', 'middleware' => [AdminMiddleware::class]],
@@ -109,6 +111,22 @@ final class App
                 $router->get('/kategoriler/{id:\d+}/duzenle', [CategoryController::class, 'edit']);
                 $router->post('/kategoriler/{id:\d+}/guncelle', [CategoryController::class, 'update']);
                 $router->post('/kategoriler/{id:\d+}/sil', [CategoryController::class, 'destroy']);
+
+                // Markalar (FR-032, FR-033)
+                $router->get('/markalar', [BrandController::class, 'index']);
+                $router->get('/markalar/olustur', [BrandController::class, 'create']);
+                $router->post('/markalar', [BrandController::class, 'store']);
+                $router->get('/markalar/{id:\d+}/duzenle', [BrandController::class, 'edit']);
+                $router->post('/markalar/{id:\d+}/guncelle', [BrandController::class, 'update']);
+                $router->post('/markalar/{id:\d+}/sil', [BrandController::class, 'destroy']);
+
+                // Ürünler (FR-010, FR-011, FR-015)
+                $router->get('/urunler', [ProductController::class, 'index']);
+                $router->get('/urunler/olustur', [ProductController::class, 'create']);
+                $router->post('/urunler', [ProductController::class, 'store']);
+                $router->get('/urunler/{id:\d+}/duzenle', [ProductController::class, 'edit']);
+                $router->post('/urunler/{id:\d+}/guncelle', [ProductController::class, 'update']);
+                $router->post('/urunler/{id:\d+}/sil', [ProductController::class, 'destroy']);
             }
         );
     }

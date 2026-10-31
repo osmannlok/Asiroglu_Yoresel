@@ -175,5 +175,21 @@ Misafir sepeti yalnızca PHP session içinde tutulacaktır.
 - Panel erişimi `admin` ve `staff`; tam yönetici yetkisi yalnızca `admin`.
 - Slug: boşsa addan üretilir ve benzersizleştirilir; elle girilen çakışırsa hata. UNIQUE indeks soft delete'li kayıtları da kapsar.
 - Silme soft delete'tir. Alt kategorisi veya silinmemiş ürünü olan kategori, silinmemiş ürünü olan marka silinemez; önce pasifleştirilir.
-- Kategori/marka görseli Uploader yazılana kadar kapsam dışıdır.
+- Kategori görseli ve marka logosu: Uploader yazıldı (2026-10-31). Formlara ekleme ayrı görevdir; formlara `enctype="multipart/form-data"` eklenmelidir.
 - Admin CRUD ekranları: POST + CSRF, silme için ortak onay modalı, hata durumunda eski girdi flash ile taşınır.
+  ## Ürün Kuralları
+
+  - Ürün silme soft delete'tir; sipariş geçmişi anlık kopya sayesinde etkilenmez.
+  - products.stock_quantity yalnızca oluşturmada başlangıç stoğu olarak yazılır; sonraki değişiklikler stok modülünden yapılır.
+  - Varyantlı üründe products.stock_quantity yazılamaz (Product::update reddeder).
+  - SKU ürünler ve varyantlar arasında benzersizdir (kontrol Product::skuExists).
+  - Vitrinde pasif/silinmiş kategori veya markadaki ürünler listelenmez.
+  - Fiyat girişinde ondalık ayırıcı nokta; virgül kabul edilmez.
+
+  ## Görsel Yükleme Kuralları
+
+  - Uploader (App\Core): jpg, jpeg, png, webp; en fazla 2 MB ve 6000x6000 px.
+  - MIME finfo ile içerikten okunur, getimagesize ile doğrulanır; uzantı MIME ile tutarlı olmalıdır.
+  - Dosya adı rastgele üretilir; DB'ye yalnızca göreli yol yazılır.
+  - Hedef klasör beyaz listeden gelir: products, categories, brands, banners.
+  - Üründe tek ana görsel; ilk görsel otomatik ana olur.
