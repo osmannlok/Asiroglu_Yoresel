@@ -43,6 +43,10 @@
 - [x] `app/Models/ProductImage.php` yazıldı (tek ana görsel kuralı, sıralama, alt metin)
 - [ ] `Admin/ProductImageController.php` ve ürün formunda görsel arayüzü bekliyor
 - [ ] Marka, ürün ve ürün görseli dosyalarında `php -l` ve elle test çalıştırılmadı
+- [x] Varyant modülü başladı (2026-10-31): `Models/ProductVariant.php`, `Admin/ProductVariantController.php`, `admin/products/variants/index.php` yazıldı; 6 varyant route'u `App.php`'de (liste, oluştur, kaydet, düzenle, güncelle, durum)
+- [x] Varyant dosyalarında `php -l` geçti (model, controller, `App.php`, index view); veritabanıyla elle test yapılmadı
+- [ ] `admin/products/variants/form.php` bekliyor (liste ve oluştur/düzenle sayfaları bu view olmadan hata verir)
+- [ ] Ürün formundan ve ürün listesinden varyant sayfasına bağlantı bekliyor
 
 ## 3. Oluşturulan Migration Dosyaları
 
@@ -85,13 +89,15 @@ Toplam: 18 migration dosyası, 31 uygulama tablosu (schema_migrations hariç).
 - `Uploader` (App\Core): statik `save`, `saveMany`, `delete`; klasör beyaz listesi `products|categories|brands|banners`
 - `Admin\ProductController`
 - View: `admin/brands/{index,form}`, `admin/products/{index,form}`
-
+- `ProductVariant`: fiziksel silme yok (`delete()` kapalı, `setActive()` kullanılır); `getByProduct`, `findForProduct`, `countByProduct`, `isPurchasable`, `currentPrice`, `skuExists` (varyant + ürün), `nameExists`; `create()` ürünün varlığını ve fiyat kurallarını denetler; `update()` `product_id` ve `stock_quantity` yazmayı reddeder
+- `Admin\ProductVariantController`: `index`, `create`, `store`, `edit`, `update`, `toggle` (Fetch için JSON, form için yönlendirme); varyantın URL'deki ürüne ait olduğunu doğrular
+- View: `admin/products/variants/index` (aktif/pasif anahtarı Fetch ile)
 
 ## 5. Sıradaki Dosya
 
 1. `app/Controllers/Admin/ProductImageController.php` (yükleme, ana yapma, sıralama, alt metin, silme) + route'lar
 2. Ürün formuna görsel bölümü (düzenleme ekranı; `enctype="multipart/form-data"`)
-3. `Models/ProductVariant.php` + varyant controller/view'ları
+3. `admin/products/variants/form.php`, ardından ürün formu ve ürün listesine "Varyantlar" bağlantısı
 4. Stok modülü: `StockMovement` modeli, manuel stok hareketleri (FR-026)
 5. Dashboard: ürün sayısı ve kritik stok kartı (FR-097)
 6. Kategori/marka formlarına görsel/logo alanı (Uploader hazır; DECISIONS karar 22 güncellenecek)
@@ -133,6 +139,10 @@ Bekleyen migration yazımı yok (001–018 yazıldı). Bekleyen iş: 010–018'i
 27. **Ürün silme:** soft delete; sipariş kalemleri anlık kopya tuttuğu için sipariş geçmişi etkilenmez. Görsel dosyaları ürün geri getirilebilsin diye silinmez.
 28. **Uploader:** yalnızca jpg/jpeg/png/webp; MIME `finfo` ile içerikten, `getimagesize()` ile doğrulanır; uzantı MIME ile tutarlı olmalı; en fazla 2 MB ve 6000x6000 px; dosya adı rastgele (32 hex); DB'ye yalnızca göreli yol yazılır (`products/ab12....jpg`).
 29. **Ana görsel:** üründe tek `is_main`; ilk görsel otomatik ana; ana görsel silinirse sıradaki ana olur. Model dosya sistemine dokunmaz.
+30. **Varyantlar silinmez:** satıştan kaldırmak için `is_active = 0` kullanılır (`ProductVariant::delete()` kapalı). Sipariş kalemleri ve stok hareketleri bu yüzden etkilenmez.
+31. **Varyant stoğu:** `product_variants.stock_quantity` yalnızca varyant oluştururken başlangıç stoğu olarak yazılır; güncellemede yazılmaz (stok modülünden, FR-026). Varyant ürün değiştiremez (`product_id` değişmez).
+32. **Varyant benzersizliği:** aynı üründe aynı varyant adı kullanılamaz; SKU ürünler ve varyantlar arasında benzersizdir (karar 24 ile aynı kural).
+33. **Kritik stok eşiği:** varyantlarda ayrı eşik yok; "Kritik" uyarısı ürünün `critical_stock_quantity` değerini kullanır.
 
 ## 8. Bilinen Riskler
 
@@ -153,7 +163,8 @@ Bekleyen migration yazımı yok (001–018 yazıldı). Bekleyen iş: 010–018'i
 ### Orta
 
 - Başlangıç stoğu için `stock_movements` kaydı atılmıyor (`StockMovement` modeli yok). Stok modülünde, ürün oluşturma akışına eklenecek.
-- FR-021 varyant başına kritik stok eşiği istiyor; migration 007'de bu sütun yok. `Product::getLowStock()` yalnızca varyantsız ürünleri kapsıyor. Varyant modülünden önce karar verilmeli (yeni migration gerekir: 019).
+- FR-021 varyant başına kritik stok eşiği istiyor; migration 007'de bu sütun yok. Karar 33'e göre ürünün eşiği kullanılıyor, migration 019 açılmadı. `Product::getLowStock()` yalnızca varyantsız ürünleri kapsıyor; varyantlı ürünlerin kritik stok listesi stok modülünde ele alınmalı.
+- Varyant oluşturulurken girilen başlangıç stoğu için `stock_movements` kaydı atılmıyor (`StockMovement` modeli yok). Ürün başlangıç stoğuyla aynı sorun; stok modülünde birlikte çözülecek.
 - WebP yüklemesi için sunucuda GD/WebP desteği gerekir; yoksa "geçerli görsel değil" hatası verir.
 - `php.ini` `upload_max_filesize` ve `post_max_size` 2 MB'tan düşükse Uploader'a ulaşmadan reddedilir.
 - Kategori ve marka formlarında `enctype="multipart/form-data"` yok; görsel/logo eklenirken eklenecek.
@@ -186,6 +197,7 @@ Bekleyen migration yazımı yok (001–018 yazıldı). Bekleyen iş: 010–018'i
 - 2026-10-31 (Category, Brand, User, Auth, AdminMiddleware, Router, admin giriş ve layout dosyaları; php -l henüz çalıştırılmadı)
 - 2026-10-31 (dashboard view, kategori ve marka dosyaları yazıldı; php -l çalıştırılmadı).
 - 2026-10-31 (ürün modülü, Uploader ve ProductImage yazıldı; php -l ve elle test çalıştırılmadı).
+- 2026-10-31 (varyant modeli, controller, route'lar ve liste view'ı yazıldı; yalnızca `php -l` çalıştırıldı, veritabanı ve tarayıcı testi yapılmadı).
 
 ## Teknik Kararlar
 
@@ -202,7 +214,7 @@ Kararların tamamı için bkz. DECISIONS.md.
 
 1. `app/Controllers/Admin/ProductImageController.php` (yükleme, ana yapma, sıralama, alt metin, silme) + route'lar
 2. Ürün formuna görsel bölümü (düzenleme ekranı; `enctype="multipart/form-data"`)
-3. `Models/ProductVariant.php` + varyant controller/view'ları
+3. `admin/products/variants/form.php`, ardından ürün formu ve ürün listesine "Varyantlar" bağlantısı
 4. Stok modülü: `StockMovement` modeli, manuel stok hareketleri (FR-026)
 5. Dashboard: ürün sayısı ve kritik stok kartı (FR-097)
 6. Kategori/marka formlarına görsel/logo alanı (Uploader hazır; DECISIONS karar 22 güncellenecek)

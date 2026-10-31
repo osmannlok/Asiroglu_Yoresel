@@ -18,6 +18,9 @@ use App\Controllers\Admin\DashboardController;
 use App\Controllers\Admin\ProductController;
 use App\Controllers\HomeController;
 use App\Middleware\AdminMiddleware;
+use App\Controllers\Admin\ProductController;
+use App\Controllers\Admin\ProductVariantController;
+use App\Controllers\HomeController;
 use Throwable;
 
 final class App
@@ -127,6 +130,16 @@ final class App
                 $router->get('/urunler/{id:\d+}/duzenle', [ProductController::class, 'edit']);
                 $router->post('/urunler/{id:\d+}/guncelle', [ProductController::class, 'update']);
                 $router->post('/urunler/{id:\d+}/sil', [ProductController::class, 'destroy']);
+            
+                                $router->post('/urunler/{id:\d+}/sil', [ProductController::class, 'destroy']);
+
+                // Ürün varyantları (FR-020, FR-021, FR-022, FR-025)
+                $router->get('/urunler/{id:\d+}/varyantlar', [ProductVariantController::class, 'index']);
+                $router->get('/urunler/{id:\d+}/varyantlar/olustur', [ProductVariantController::class, 'create']);
+                $router->post('/urunler/{id:\d+}/varyantlar', [ProductVariantController::class, 'store']);
+                $router->get('/urunler/{id:\d+}/varyantlar/{vid:\d+}/duzenle', [ProductVariantController::class, 'edit']);
+                $router->post('/urunler/{id:\d+}/varyantlar/{vid:\d+}/guncelle', [ProductVariantController::class, 'update']);
+                $router->post('/urunler/{id:\d+}/varyantlar/{vid:\d+}/durum', [ProductVariantController::class, 'toggle']);
             }
         );
     }

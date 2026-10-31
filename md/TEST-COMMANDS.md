@@ -49,6 +49,9 @@ php -l app/Views/admin/products/index.php
 php -l app/Views/admin/products/form.php
 php -l app/Core/Uploader.php
 php -l app/Models/ProductImage.php
+php -l app/Models/ProductVariant.php
+php -l app/Controllers/Admin/ProductVariantController.php
+php -l app/Views/admin/products/variants/index.php
 
 ### Tüm PHP dosyalarını tek seferde tara
 
@@ -124,4 +127,13 @@ git rm --cached <dosya>
    - Listede arama (ad ve SKU), kategori ve durum filtresi, sayfalamada filtrelerin korunması
    - Stok 0 → "Tükendi", stok ≤ eşik → "Kritik" rozeti
    - Ürünü sil (onay modalı, listeden kalkmalı)
-7. CSRF'siz POST → 419
+7. Varyant: ürün düzenlemeden `/admin/urunler/{id}/varyantlar` (ürün yoksa listeye hata ile döner)
+   - Boş listede "Yeni Varyant" uyarısı görünmeli
+   - "500 Gr" ekle; aynı üründe ikinci "500 Gr" (hata); başka üründe "500 Gr" (kabul)
+   - Aynı SKU'yu başka varyant veya ürün SKU'suyla dene (hata)
+   - İndirimli fiyat ≥ satış fiyatı (hata); fiyata `250,50` (reddedilmeli), `250.50` (kabul)
+   - Düzenlemede başlangıç stoğu salt okunur olmalı ve değişmemeli
+   - Başka ürünün varyant ID'siyle `/urunler/{id}/varyantlar/{vid}/duzenle` (listeye "Varyant bulunamadı." ile dönmeli)
+   - Listede anahtarı kapat/aç: sayfa yenilenmemeli, toast görünmeli; ağ hatasında anahtar eski haline dönmeli
+   - Varyant eklenince ürün listesinde "Varyantlı (n)" rozeti görünmeli 
+8. CSRF'siz POST → 419
