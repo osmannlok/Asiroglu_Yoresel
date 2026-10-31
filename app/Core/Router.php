@@ -5,6 +5,21 @@
  *
  * HTTP metodu ve URL yolunu controller metotlarıyla eşleştirir.
  * Dinamik parametreleri ({slug}, {id:\d+}) destekler.
+ *
+ * Middleware: route'a veya route grubuna sınıf adı listesi verilebilir.
+ * Middleware sınıfları handle(Request $request): ?Response metoduna sahip
+ * olmalıdır. null dönerse istek devam eder; Response dönerse zincir durur
+ * ve controller çağrılmaz. Middleware yalnızca eşleşen route için çalışır.
+ *
+ * Örnek:
+ *   $router->group(
+ *       ['prefix' => '/admin', 'middleware' => [AdminMiddleware::class]],
+ *       function (Router $router): void {
+ *           $router->get('/', [DashboardController::class, 'index']);
+ *       }
+ *   );
+ *
+ * Gereksinimler: FR-090, G-04.
  */
 
 declare(strict_types=1);
@@ -19,48 +34,89 @@ final class Router
     /**
      * Kayıtlı route'lar: HTTP metodu => route listesi
      *
-     * @var array<string, list<array{pattern: string, regex: string, handler: array{0: class-string, 1: string}|Closure}>>
+     * @var array<string, list<array{
+     *     pattern: string,
+     *     regex: string,
+     *     handler: array{0: class-string, 1: string}|Closure,
+     *     middleware: list<class-string>
+     * }>>
      */
     private array $routes = [];
 
     /**
-     * @param array{0: class-string, 1: string}|Closure $handler
+     * Açık grupların yığını (en içteki sonda).
+     *
+     * @var list<array{prefix: string, middleware: list<class-string>}>
      */
-    public function get(string $pattern, array|Closure $handler): void
+    private array $groupStack = [];
+
+    /**
+     * @param array{0: class-string, 1: string}|Closure $handler
+     * @param list<class-string>                        $middleware
+     */
+    public function get(string $pattern, array|Closure $handler, array $middleware = []): void
     {
-        $this->add('GET', $pattern, $handler);
+        $this->add('GET', $pattern, $handler, $middleware);
     }
 
     /**
      * @param array{0: class-string, 1: string}|Closure $handler
+     * @param list<class-string>                        $middleware
      */
-    public function post(string $pattern, array|Closure $handler): void
+    public function post(string $pattern, array|Closure $handler, array $middleware = []): void
     {
-        $this->add('POST', $pattern, $handler);
+        $this->add('POST', $pattern, $handler, $middleware);
     }
 
     /**
      * @param array{0: class-string, 1: string}|Closure $handler
+     * @param list<class-string>                        $middleware
      */
-    public function put(string $pattern, array|Closure $handler): void
+    public function put(string $pattern, array|Closure $handler, array $middleware = []): void
     {
-        $this->add('PUT', $pattern, $handler);
+        $this->add('PUT', $pattern, $handler, $middleware);
     }
 
     /**
      * @param array{0: class-string, 1: string}|Closure $handler
+     * @param list<class-string>                        $middleware
      */
-    public function patch(string $pattern, array|Closure $handler): void
+    public function patch(string $pattern, array|Closure $handler, array $middleware = []): void
     {
-        $this->add('PATCH', $pattern, $handler);
+        $this->add('PATCH', $pattern, $handler, $middleware);
     }
 
     /**
      * @param array{0: class-string, 1: string}|Closure $handler
+     * @param list<class-string>                        $middleware
      */
-    public function delete(string $pattern, array|Closure $handler): void
+    public function delete(string $pattern, array|Closure $handler, array $middleware = []): void
     {
-        $this->add('DELETE', $pattern, $handler);
+        $this->add('DELETE', $pattern, $handler, $middleware);
+    }
+
+    /**
+     * Ortak ön ek ve/veya middleware'e sahip route grubu tanımlar.
+     * Gruplar iç içe olabilir; ön ekler ve middleware'ler birleştirilir.
+     *
+     * Desteklenen seçenekler: 'prefix' (örn. '/admin'), 'middleware' (sınıf listesi).
+     *
+     * @param array{prefix?: string, middleware?: list<class-string>} $options
+     * @param Closure(self): void                                      $callback Route'ları kaydeden fonksiyon
+     */
+    public function group(array $options, Closure $callback): void
+    {
+        $this->groupStack[] = [
+            'prefix'     => (string) ($options['prefix'] ?? ''),
+            'middleware' => array_values($options['middleware'] ?? []),
+        ];
+
+        try {
+            $callback($this);
+        } finally {
+            // Callback hata fırlatsa bile grup yığını tutarlı kalır
+            array_pop($this->groupStack);
+        }
     }
 
     /**
@@ -87,7 +143,7 @@ final class Router
                         }
                     }
 
-                    return $this->invoke($route['handler'], $request, $params);
+                    return $this->invoke($route['handler'], $request, $params, $route['middleware']);
                 }
             }
         }
@@ -106,18 +162,31 @@ final class Router
     }
 
     /**
-     * Route'u kaydeder ve desenini düzenli ifadeye çevirir.
+     * Route'u kaydeder; grup ön eklerini ve middleware'lerini uygular ve
+     * desenini düzenli ifadeye çevirir.
      *
      * @param array{0: class-string, 1: string}|Closure $handler
+     * @param list<class-string>                        $middleware
      */
-    private function add(string $method, string $pattern, array|Closure $handler): void
+    private function add(string $method, string $pattern, array|Closure $handler, array $middleware): void
     {
-        $pattern = $this->normalizePath($pattern);
+        $prefix      = '';
+        $inherited   = [];
+
+        foreach ($this->groupStack as $group) {
+            $prefix   .= '/' . trim($group['prefix'], '/');
+            $inherited = array_merge($inherited, $group['middleware']);
+        }
+
+        // Ön ek + desen birleştirilir; normalizePath fazla "/" karakterlerini temizler
+        $pattern = $this->normalizePath($prefix . '/' . ltrim($pattern, '/'));
 
         $this->routes[$method][] = [
-            'pattern' => $pattern,
-            'regex'   => $this->compile($pattern),
-            'handler' => $handler,
+            'pattern'    => $pattern,
+            'regex'      => $this->compile($pattern),
+            'handler'    => $handler,
+            // Önce grup middleware'leri, sonra route'a özel olanlar çalışır
+            'middleware' => array_merge($inherited, array_values($middleware)),
         ];
     }
 
@@ -154,10 +223,11 @@ final class Router
 
     /**
      * Yolu normalleştirir: başında "/" olur, sonunda "/" olmaz (kök hariç).
+     * Ardışık "/" karakterleri tek "/" olur.
      */
     private function normalizePath(string $path): string
     {
-        $path = '/' . trim($path, '/');
+        $path = '/' . trim((string) preg_replace('#/{2,}#', '/', $path), '/');
 
         return $path === '' ? '/' : $path;
     }
@@ -185,13 +255,21 @@ final class Router
     }
 
     /**
-     * Eşleşen handler'ı çalıştırır ve sonucu Response'a çevirir.
+     * Middleware zincirini, ardından eşleşen handler'ı çalıştırır ve sonucu
+     * Response'a çevirir. Bir middleware Response döndürürse zincir durur.
      *
      * @param array{0: class-string, 1: string}|Closure $handler
      * @param array<string, string>                     $params
+     * @param list<class-string>                        $middleware
      */
-    private function invoke(array|Closure $handler, Request $request, array $params): Response
+    private function invoke(array|Closure $handler, Request $request, array $params, array $middleware): Response
     {
+        $blocked = $this->runMiddleware($middleware, $request);
+
+        if ($blocked !== null) {
+            return $blocked;
+        }
+
         if ($handler instanceof Closure) {
             $result = $handler($request, $params);
         } else {
@@ -211,6 +289,44 @@ final class Router
         }
 
         return $this->toResponse($result);
+    }
+
+    /**
+     * Middleware'leri sırayla çalıştırır.
+     *
+     * Geçersiz bir middleware tanımı istekten GEÇİRİLMEZ; hata fırlatılır
+     * (App::run() bunu 500'e çevirir). Böylece yanlış yazılmış bir sınıf
+     * adı koruma açığına dönüşmez.
+     *
+     * @param list<class-string> $middleware
+     *
+     * @return Response|null Zinciri durduran yanıt; hepsi geçtiyse null
+     */
+    private function runMiddleware(array $middleware, Request $request): ?Response
+    {
+        foreach ($middleware as $class) {
+            if (!is_string($class) || !class_exists($class)) {
+                throw new RuntimeException('Middleware bulunamadı: ' . (is_string($class) ? $class : gettype($class)));
+            }
+
+            $instance = new $class();
+
+            if (!method_exists($instance, 'handle')) {
+                throw new RuntimeException('Middleware handle() metoduna sahip değil: ' . $class);
+            }
+
+            $result = $instance->handle($request);
+
+            if ($result instanceof Response) {
+                return $result;
+            }
+
+            if ($result !== null) {
+                throw new RuntimeException('Middleware geçersiz bir değer döndürdü: ' . $class);
+            }
+        }
+
+        return null;
     }
 
     /**

@@ -11,7 +11,9 @@ declare(strict_types=1);
 
 namespace App\Core;
 
+use App\Controllers\Admin\AuthController as AdminAuthController;
 use App\Controllers\HomeController;
+use App\Middleware\AdminMiddleware;
 use Throwable;
 
 final class App
@@ -80,7 +82,25 @@ final class App
      */
     private function registerRoutes(): void
     {
+        // --- Vitrin ---------------------------------------------------------
         $this->router->get('/', [HomeController::class, 'index']);
+
+        // --- Yönetim paneli: giriş ve çıkış ---------------------------------
+        // Bu route'lar AdminMiddleware grubunun DIŞINDA kalmalıdır; aksi halde
+        // giriş sayfası giriş yapmamış kullanıcıyı kendisine yönlendirir.
+        $this->router->get(AdminMiddleware::LOGIN_PATH, [AdminAuthController::class, 'showLogin']);
+        $this->router->post(AdminMiddleware::LOGIN_PATH, [AdminAuthController::class, 'login']);
+        $this->router->post('/admin/cikis', [AdminAuthController::class, 'logout']);
+
+        // --- Yönetim paneli: korumalı route'lar -----------------------------
+        // Dashboard, kategori, marka vb. route'lar şu grubun İÇİNE eklenecektir:
+        //
+        // $this->router->group(
+        //     ['prefix' => '/admin', 'middleware' => [AdminMiddleware::class]],
+        //     function (Router $router): void {
+        //         $router->get('/', [DashboardController::class, 'index']);
+        //     }
+        // );
     }
 
     /**

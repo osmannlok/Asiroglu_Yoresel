@@ -27,6 +27,15 @@ php -l app/Core/Validator.php
 php -l app/Controllers/HomeController.php
 php -l app/Views/layouts/main.php
 php -l app/Views/home/index.php
+php -l app/Models/Category.php
+php -l app/Core/Auth.php
+php -l app/Models/Brand.php
+php -l app/Models/User.php
+php -l app/Middleware/AdminMiddleware.php
+php -l app/Controllers/Admin/AuthController.php
+php -l app/Controllers/Admin/DashboardController.php
+php -l app/Views/admin/auth/login.php
+php -l app/Views/layouts/admin.php
 
 ### Tüm PHP dosyalarını tek seferde tara
 
@@ -36,8 +45,6 @@ Not: `config/payment.php` ve `.env` okunmaz. Tarama `config/payment.php` dosyas�
 bu dosya için sözdizimi kontrolü atlanır veya kullanıcı kendisi çalıştırır.
 
 ## Migration Kontrolü
-
-> `database/migrate.php` henüz oluşturulmadı. Aşağıdaki komutlar dosya oluşturulduktan sonra geçerlidir.
 
 php database/migrate.php --status
 php database/migrate.php

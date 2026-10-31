@@ -335,8 +335,8 @@ Gıda ürünlerinde; içerik, alerjen, menşe, raf ömrü, saklama koşulu ve t�
 Claude aşağıdaki sırayı takip edecektir:
 
 1. MVC çekirdek altyapısı (tamamlandı)
-2. Veritabanı migration dosyaları (001–009 tamamlandı; `migrate.php` ve 010–018 bekliyor)
-3. Kategori ve marka yönetimi
+2. Veritabanı migration dosyaları (001–018 tamamlandı)
+3. Kategori ve marka yönetimi (modeller ve admin kimlik doğrulama altyapısı tamamlandı; controller ve view’lar bekliyor)
 4. Ürün yönetimi
 5. Ürün görselleri ve varyantlar
 6. Stok yönetimi

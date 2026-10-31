@@ -148,6 +148,7 @@ Misafir sepeti yalnızca PHP session içinde tutulacaktır.
 - Tüm formlarda CSRF token kullanılır.
 - Şifreler password_hash() ile saklanır.
 - Admin paneli yetkilendirme ile korunur.
+- Mimari kararların tek kaynağı bu dosya, PROJE-DURUMU.md yalnızca özetler.
 
 ## Depo ve Dosya Yönetimi
 

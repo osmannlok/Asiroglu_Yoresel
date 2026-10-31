@@ -26,6 +26,13 @@
 - [x] `DATABASE-DEPENDENCIES.md` FK listesi tamamlandı (2026-10-31)
 - [x] `TEST-COMMANDS.md` var olmayan dosya referansları temizlendi (2026-10-31)
 - [x] `PROJE-DURUMU.md` güncellendi (2026-10-31)
+- [x] Kategori/marka modülü başladı (2026-10-31): `app/Models/Category.php`, `app/Models/Brand.php` yazıldı
+- [x] Kimlik doğrulama altyapısı yazıldı (2026-10-31): `app/Models/User.php`, `app/Core/Auth.php`, `app/Middleware/AdminMiddleware.php`
+- [x] `app/Core/Router.php` middleware ve `group()` desteğiyle yeniden yazıldı
+- [x] Admin giriş/çıkış: `app/Controllers/Admin/AuthController.php`, `app/Views/admin/auth/login.php`; `/admin/giris` ve `/admin/cikis` route'ları `App.php`'ye eklendi
+- [x] `app/Views/layouts/admin.php` (sidebar, üst bar, toast, onay modalı) yazıldı
+- [x] `app/Controllers/Admin/DashboardController.php` yazıldı
+- [ ] Yukarıdaki dosyalarda `php -l` ve geçici test betikleri henüz çalıştırılmadı (çalıştırınca [x] yapın)
 
 ## 3. Oluşturulan Migration Dosyaları
 
@@ -54,8 +61,10 @@ Toplam: 18 migration dosyası, 31 uygulama tablosu (schema_migrations hariç).
 
 ## 4. Oluşturulan Modeller
 
-- Şu anda yalnızca soyut `App\Core\Model` sınıfı vardır.
-- `app/Models/` altında alt sınıf model henüz yoktur.
+- Soyut `App\Core\Model` (temel CRUD, transaction, prepared statement yardımcıları)
+- `Category`: soft delete, `findBySlug`, `getActiveTree`, `paginate`, `slugExists`, `wouldCreateCycle`, `hasChildren`, `hasActiveProducts`; `update()` döngü kontrolü yapar
+- `Brand`: soft delete, `findBySlug`, `getActive`, `paginate`, `slugExists`, `hasActiveProducts`
+- `User`: soft delete; `create()` kapalı, kullanıcı yalnızca `createUser()` ile oluşturulur; `verifyCredentials`, `findActiveById`, `findByEmail`, `emailExists`, `changePassword`, `updateProfile`; `find()`/`all()` çıktısında `password_hash` ve `remember_token` yoktur; `update()` `user_type` ve `password_hash` yazmayı reddeder
 
 ## 5. Sıradaki Dosya
 
@@ -82,7 +91,12 @@ Bekleyen migration yazımı yok (001–018 yazıldı). Bekleyen iş: 010–018'i
 10. **Migration sırası:** 001–018 sırası Bölüm 3'teki gibidir ve `DATABASE-DEPENDENCIES.md` ile aynıdır.
 11. Misafir sepeti yalnızca PHP session'da; carts yalnızca üye sepeti (user_id NOT NULL).
 12. Migration çalıştırıcı: schema_migrations'a checksum kaydeder; çalışmış dosya değişirse durur.
-
+13. **Yetkilendirme:** Oturumda yalnızca kullanıcı ID'si tutulur (`_auth_user_id`); rol ve durum her istekte DB'den okunur, pasifleştirilen kullanıcı hemen düşer. Panel erişimi `admin` ve `staff`, tam yönetici yetkisi yalnızca `admin`.
+14. **Kullanıcı oluşturma:** `User::create()` kapalıdır; `user_type` hiçbir zaman form girdisinden alınmaz.
+15. **Admin girişi:** Müşteri hesabı admin girişi yapamaz; hata mesajı yanlış şifre ile aynıdır. Şifre `Validator`'dan geçirilmez (boşluk anlamlıdır). Giriş sonrası dönüş adresi yalnızca `/admin` altındaki güvenli yollarla sınırlıdır. Çıkış yalnızca POST.
+16. **Middleware:** `handle(Request): ?Response` sözleşmesi; `null` = devam, `Response` = zincir durur. Geçersiz middleware tanımı istekten geçirilmez, hata fırlatır (500). Admin route'ları `Router::group()` ile korunur; giriş route'ları grubun dışında kalır.
+17. **Slug/e-posta benzersizliği:** UNIQUE indeksler soft delete'li kayıtları da kapsadığı için `slugExists()` ve `emailExists()` silinmiş kayıtları da sayar.
+18. **Silme kuralları:** Silinmemiş ürünü veya alt kategorisi olan kategori, silinmemiş ürünü olan marka silinemez (önce pasifleştirilir).
 
 
 ## 8. Bilinen Riskler
@@ -95,6 +109,8 @@ Bekleyen migration yazımı yok (001–018 yazıldı). Bekleyen iş: 010–018'i
 - İkinci bir spesifikasyon seti (`GEREKSİNİMLER.MD`, `00-PROJE-TALİMATI.MD`, `02`, `03`, `04`) mevcut şema ile çelişiyor ve `gereksinimler.md`'yi "tek doğruluk kaynağı" ilan ediyor. Farklar: `roles`/`permissions` tabloları, `order_addresses`/`order_shipments`, varyant `price_difference`, varyant `critical_stock_quantity`, ayrı iade durumları, alan adları (`name`/`sale_price`/`tax_rate`/`stock`), `resources/views` ve `Services`/`Repositories` klasörleri. Hangi belge setinin geçerli olduğu netleşmeli.
 - `storage/sessions` dosyaları Git'e girmiş olabilir. `git ls-files storage .env` ile kontrol edilmeli, gerekirse `git rm --cached` uygulanmalı. `.gitignore` doğrulanamadı.
 - `.env` içeriği sohbette paylaşıldı. DB şifresi değiştirilmeli; `git ls-files .env storage` ile .env ve storage/sessions/sess_* dosyalarının Git'te olmadığı doğrulanmalı.
+- **Admin girişinde rate limiting yok.** `Request::ip()` proxy düzeltmesinden önce eklenemez (DECISIONS.md teknik borcu). Bu çözülene kadar sunucu internete açılmamalı.
+- `CLAUDE.md` "Sepet ve Sipariş Kuralları" bölümü hâlâ misafir sepetini `carts.session_id` ile DB'de tutuyor diyor; DECISIONS.md'ye göre yalnızca session. Sepet modülünden önce düzeltilmeli.
 
 ### Orta
 
@@ -107,6 +123,9 @@ Bekleyen migration yazımı yok (001–018 yazıldı). Bekleyen iş: 010–018'i
 - `ashiroglu-market-php-mvc-eticaret-raporu.md` eski kararları içeriyor (`stocks`, `odendi`, orders 1—1 payments/shipments). `md/` altına taşınmalı.
 - `md/` klasöründe kopya dosyalar var ve sapma riski taşıyor.
 - `Request::ip()` proxy veya Cloudflare arkasında yanlış IP verir. Admin rate limiting'den önce çözülmeli.
+- Yeni dosyalarda `php -l` ve geçici test betikleri çalıştırılmadı; `tmp_*.php` dosyaları işiniz bitince silinmeli (özellikle `tmp_create_admin.php`).
+- `Router::normalizePath()` artık ardışık `/` karakterlerini tek `/` yapıyor; `/admin//x` ile `/admin/x` aynı route'a eşleşir.
+- Menüdeki `/admin/kategoriler` ve `/admin/markalar` bağlantıları controller'lar yazılana kadar 404 verir.
 
 ### Düşük
 
@@ -114,10 +133,13 @@ Bekleyen migration yazımı yok (001–018 yazıldı). Bekleyen iş: 010–018'i
 - `Router` 405 yanıtı Fetch istekleri için JSON değil ve `Allow` başlığı yok.
 - Bilinmeyen bir yola yapılan POST, CSRF kontrolü route eşleşmesinden önce yapıldığı için 404 yerine 419 döner.
 - Kupon iptalinde `coupon_usages` kaydı silindiği için kullanım denetim izi kaybolur. Gerekirse sonradan `activity_logs` ile desteklenmeli.
+- Bootstrap CDN SRI hash'i admin giriş sayfası ve admin layout'unda da yok (mevcut SRI görevine dahil).
+- Admin girişleri `activity_logs`'a yazılmıyor (`ActivityLog` modeli henüz yok).
 
 ## 9. Son Doğrulama Tarihi
 
 - 2026-10-31 (010–018 ve migrate.php sonrası)
+- 2026-10-31 (Category, Brand, User, Auth, AdminMiddleware, Router, admin giriş ve layout dosyaları; php -l henüz çalıştırılmadı)
 
 ## Teknik Kararlar
 
@@ -132,4 +154,7 @@ Kararların tamamı için bkz. DECISIONS.md.
 
 ## Sıradaki Adım
 
-- sıradaki adım Bölüm 5'te.
+1. `app/Views/admin/dashboard/index.php`
+2. `App.php` içinde korumalı `/admin` grubu (`AdminMiddleware` ile `GET /admin` → `DashboardController::index`)
+3. `CLAUDE.md` düzeltmesi (misafir sepeti DB'de yazıyor; DECISIONS.md'ye göre yalnızca session)
+4. `Admin/CategoryController` ve view'ları, ardından `Admin/BrandController`
