@@ -1,25 +1,31 @@
 -- =============================================================================
 -- Migration 011: carts, cart_items
--- Aşıroğlu Yöresel Market - Sepetler ve sepet kalemleri
+-- Aşıroğlu Yöresel Market - Üye sepetleri ve sepet kalemleri
 -- Bağımlılık: users (001), products (005), product_variants (007), coupons (010)
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
 -- 1. Sepet başlığı
---    Üye sepeti: user_id dolu. Misafir sepeti: session_id dolu.
+--    Bu tablo YALNIZCA giriş yapmış kullanıcıların sepetleri içindir.
 --
---    İş kuralları (Cart modelinde uygulanır):
---    - "user_id veya session_id en az biri dolu olmalı" kuralı SQL CHECK ile
---      değil, Cart modelinde transaction içinde zorlanır.
---    - Giriş yapılınca misafir sepeti üye sepetiyle birleştirilir.
+--    Kurallar (DECISIONS.md - MİSAFİR SEPETİ ve EK KARAR):
+--    - Misafir sepeti veritabanında tutulmaz; yalnızca PHP session içinde
+--      ($_SESSION['cart']) yaşar. Ziyaretçi için carts/cart_items kaydı açılmaz.
+--    - Kullanıcı giriş yapınca session sepeti, kullanıcının DB sepetiyle
+--      transaction içinde birleştirilir (aynı ürün + varyantta adetler toplanır,
+--      stok sınırı aşılmaz).
+--    - carts.user_id her zaman dolu olmalıdır (NOT NULL).
+--    - Sipariş oluşturulunca sepetin status değeri 'converted' olur.
+--    - session_id şu aşamada KULLANILMAZ; ileride terk edilmiş sepet analizi
+--      veya kalıcı misafir sepeti için rezerve alandır.
 -- -----------------------------------------------------------------------------
 CREATE TABLE carts (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
 
-    -- Üye sepeti için; misafirde NULL
-    user_id INT UNSIGNED NULL,
+    -- Sepetin sahibi; her zaman dolu
+    user_id INT UNSIGNED NOT NULL,
 
-    -- Misafir sepeti için oturum kimliği; üyede NULL olabilir
+    -- Rezerve alan: şu aşamada kullanılmaz, NULL kalır
     session_id VARCHAR(128) NULL,
 
     -- Sepete uygulanan kupon; yoksa NULL

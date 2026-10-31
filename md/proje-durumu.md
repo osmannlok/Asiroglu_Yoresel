@@ -18,7 +18,8 @@
 - [x] `public/index.php` front controller
 - [x] `config/config.php` (`.env` okuyucu dahil) ve `config/database.php`
 - [x] `HomeController` ve `app/Views/layouts/main.php`
-- [x] Migration 001–009
+- [x] Migration 001–018 yazıldı (2026-10-31; 010, 011, 012 hiçbir veritabanına uygulanmadan DECISIONS.md'ye göre düzeltildi)
+- [x] `database/migrate.php` yazıldı (checksum denetimi, `--status`); gerçek MySQL'de henüz denenmedi
 - [x] Kalıcı dosyalar: `DECISIONS.md`, `DATABASE-DEPENDENCIES.md`, `TEST-COMMANDS.md`, `PROJE-DURUMU.md`
 - [x] Proje durum raporu hazırlandı ve onaylandı
 - [x] Kritik kararlar onaylandı (bkz. Bölüm 7)
@@ -39,8 +40,17 @@
 | 007 | `007_create_product_variants.sql` | product_variants |
 | 008 | `008_create_attributes.sql` | attributes, attribute_values, product_attributes |
 | 009 | `009_create_stock_movements.sql` | stock_movements |
+| 010 | `010_create_coupons.sql` | coupons (deleted_at dahil), coupon_usages |
+| 011 | `011_create_carts.sql` | carts (user_id NOT NULL), cart_items |
+| 012 | `012_create_orders.sql` | orders (customer_email/phone dahil), order_items, order_status_history + coupon_usages.order_id FK |
+| 013 | `013_create_payments.sql` | payments, payment_logs |
+| 014 | `014_create_shipping.sql` | shipping_methods, shipments |
+| 015 | `015_create_return_requests.sql` | return_requests |
+| 016 | `016_create_reviews_wishlists.sql` | reviews, wishlists |
+| 017 | `017_create_content_tables.sql` | banners, pages, newsletter_subscribers, contact_messages |
+| 018 | `018_create_settings.sql` | settings, activity_logs |
 
-Toplam: 9 migration dosyası, 11 tablo.
+Toplam: 18 migration dosyası, 31 uygulama tablosu (schema_migrations hariç).
 
 ## 4. Oluşturulan Modeller
 
@@ -55,19 +65,8 @@ Ardından sırayla: `app/Views/home/index.php` → `database/migrate.php` (yoksa
 
 ## 6. Bekleyen Migration Dosyaları
 
-| No | Tablolar |
-|---|---|
-| 010 | coupons, coupon_usages |
-| 011 | carts, cart_items |
-| 012 | orders, order_items, order_status_history + `coupon_usages.order_id` FK |
-| 013 | payments, payment_logs |
-| 014 | shipping_methods, shipments |
-| 015 | return_requests |
-| 016 | reviews, wishlists |
-| 017 | banners, pages, newsletter_subscribers, contact_messages |
-| 018 | settings, activity_logs |
-
-Bekleyen: 9 migration dosyası, 20 tablo. Planlanan toplam: 31 tablo.
+Bekleyen migration yazımı yok (001–018 yazıldı). Bekleyen iş: 010–018'in gerçek MySQL'de
+`migrate.php` ile çalıştırılıp doğrulanması. Planlanan 31 tablonun tamamı migration'larda mevcut.
 
 ## 7. Alınmış Kritik Kararlar
 
@@ -80,7 +79,11 @@ Bekleyen: 9 migration dosyası, 20 tablo. Planlanan toplam: 31 tablo.
 7. **Ortam dosyası:** `.env` Git takibine alınmaz. `.gitignore`'a `.env` satırı eklenir.
 8. **`Request::ip()`:** Şu aşamada değiştirilmez. Proxy veya Cloudflare arkasına geçildiğinde güvenilir proxy başlıkları ile IP tespiti yeniden değerlendirilir.
 9. **Ayrı görevler:** Güvenlik başlıkları, SRI ve 405 yanıtı düzeltmesi ayrı görevlerde yapılır.
-10. **Migration sırası:** 001–018 sırası Bölüm 3 ve Bölüm 6'daki gibidir ve `DATABASE-DEPENDENCIES.md` ile aynıdır.
+10. **Migration sırası:** 001–018 sırası Bölüm 3'teki gibidir ve `DATABASE-DEPENDENCIES.md` ile aynıdır.
+11. Misafir sepeti yalnızca PHP session'da; carts yalnızca üye sepeti (user_id NOT NULL).
+12. Migration çalıştırıcı: schema_migrations'a checksum kaydeder; çalışmış dosya değişirse durur.
+
+
 
 ## 8. Bilinen Riskler
 
@@ -88,12 +91,15 @@ Bekleyen: 9 migration dosyası, 20 tablo. Planlanan toplam: 31 tablo.
 
 - `app/Views/home/index.php` bozuk: PHP/HTML yerine klasör ağacı metni içeriyor.
 - `database/migrate.php` doğrulanamadı veya yok. `TEST-COMMANDS.md` migration komutları bu dosyaya dayanıyor.
-- `CLAUDE.md` ile `DECISIONS.md` çelişiyor: durum adı (`odendi` / `paid`, `odeme_basarisiz` / `payment_failed`) ve tablo adı (`stocks`, `logs`). `DECISIONS.md` önceliklidir ama `CLAUDE.md` düzeltilmeden 012 ve 013'te yanlış kod üretme riski var.
+- DECISIONS.md kendi içinde çelişiyor: "Sepet Kuralları" bölümü eski kuralı (user_id veya session_id) söylüyor. Bkz. DECISIONS.md 3.1.
 - İkinci bir spesifikasyon seti (`GEREKSİNİMLER.MD`, `00-PROJE-TALİMATI.MD`, `02`, `03`, `04`) mevcut şema ile çelişiyor ve `gereksinimler.md`'yi "tek doğruluk kaynağı" ilan ediyor. Farklar: `roles`/`permissions` tabloları, `order_addresses`/`order_shipments`, varyant `price_difference`, varyant `critical_stock_quantity`, ayrı iade durumları, alan adları (`name`/`sale_price`/`tax_rate`/`stock`), `resources/views` ve `Services`/`Repositories` klasörleri. Hangi belge setinin geçerli olduğu netleşmeli.
 - `storage/sessions` dosyaları Git'e girmiş olabilir. `git ls-files storage .env` ile kontrol edilmeli, gerekirse `git rm --cached` uygulanmalı. `.gitignore` doğrulanamadı.
+- `.env` içeriği sohbette paylaşıldı. DB şifresi değiştirilmeli; `git ls-files .env storage` ile .env ve storage/sessions/sess_* dosyalarının Git'te olmadığı doğrulanmalı.
 
 ### Orta
 
+`database-schema.sql` carts.user_id NULL ve cart_items FK SET NULL içeriyor (güncel migration'larla uyumsuz); yalnızca referans, çalıştırılmaz.
+- md/database-schema-test.sql eski sepet yapısını (session_id ile misafir sepeti) test ediyor; güncellenmeli veya kullanılmamalı.
 - `database-schema.sql` güncel tek kaynak değildir. `variant_key`, `customer_email`, `coupons.deleted_at` kararlarını içermez. `carts`, `coupons` tablosundan önce tanımlıdır; doğrudan çalıştırılmamalıdır.
 - Sepet modeli belirsiz: `CLAUDE.md` misafir sepetini session tabanlı, şema ise `carts.session_id` ile DB tabanlı gösteriyor. 011'den önce karar verilmeli.
 - Model API adları farklı: `model-ekle` skill'i `findById` / `getAll` / `paginate` istiyor, `Model.php`'de `find` / `all` var ve `paginate` yok.
@@ -111,7 +117,7 @@ Bekleyen: 9 migration dosyası, 20 tablo. Planlanan toplam: 31 tablo.
 
 ## 9. Son Doğrulama Tarihi
 
-- 2026-10-31
+- 2026-10-31 (010–018 ve migrate.php sonrası)
 
 ## Teknik Kararlar
 
@@ -122,88 +128,8 @@ Bekleyen: 9 migration dosyası, 20 tablo. Planlanan toplam: 31 tablo.
 - roles, permissions, role_permissions ve user_roles tabloları şu aşamada oluşturulmaz.
 - Ayrıntılı RBAC ihtiyacı ileride ayrı migration ile değerlendirilecektir.
 
-KARAR 1 — BELGE HİYERARŞİSİ:
-
-Projenin belge hiyerarşisi şu şekilde olacak:
-
-1. DECISIONS.md:
-   Mimari, veritabanı, güvenlik ve uygulama kararlarının tek kaynağıdır.
-   Diğer belgelerle çelişirse DECISIONS.md geçerlidir.
-
-2. GEREKSINIMLER.MD:
-   İş gereksinimleri, FR numaraları ve kabul kriterleri için referanstır.
-   Mimari karar kaynağı değildir.
-   DECISIONS.md ile çelişen maddeleri DECISIONS.md'e göre düzeltilecektir.
-
-3. CLAUDE.md:
-   Claude Code için kalıcı çalışma kurallarını içerir.
-   DECISIONS.md ile çelişemez.
-   Çelişki tespit edilirse DECISIONS.md kazanır.
-
-4. database/migrations klasörü:
-   Gerçek ve güncel veritabanı yapısının kaynağıdır.
-
-5. database-schema.sql:
-   Yalnızca başlangıç referansıdır.
-   Güncel veritabanı kaynağı değildir.
-
-KARAR 2 — MİSAFİR SEPETİ:
-
-Misafir sepeti yalnızca PHP session içinde tutulacaktır.
-
-- Ziyaretçi sepete ürün eklediğinde veritabanına carts veya cart_items 
-  kaydı açılmayacaktır.
-- Misafir sepeti session içinde tutulacaktır.
-- Sepet verisi session'da şu yapıda tutulabilir:
-  $_SESSION['cart'] = [
-      'items' => [
-          [
-              'product_id' => 5,
-              'product_variant_id' => null,
-              'quantity' => 2
-          ]
-      ]
-  ];
-
-- Kullanıcı giriş yaptığında session sepeti, kullanıcının mevcut DB sepetiyle 
-  birleştirilecek.
-- Aynı ürün ve aynı varyant varsa adetler toplanacak.
-- Aynı ürün + varyant kombinasyonu yoksa yeni sepet kalemi oluşturulacak.
-- Birleştirme işlemi transaction içinde yapılacak.
-- Stok kontrolü birleştirme sırasında yapılacak.
-- Stok yetersizse kullanıcı bilgilendirilecek ve mümkün olan maksimum adet eklenmeyecek; 
-  sepet kaydı stok sınırını aşmayacak.
-
-- Giriş yapmış kullanıcı için sepet carts ve cart_items tablolarında tutulacak.
-- Sipariş oluşturulduğunda kullanıcı sepetinin status değeri 'converted' olacak.
-
-- carts.session_id alanı şu aşamada misafir sepeti için kullanılmayacak.
-- Bu alan ileride terk edilmiş sepet analizi veya kalıcı misafir sepeti 
-  özelliği için rezerve olarak kalacak.
-
-- carts tablosu yalnızca giriş yapmış kullanıcıların sepetleri için kullanılacak.
-- Bu nedenle carts.user_id alanı NOT NULL olacak şekilde değerlendirilecek.
-- Ancak mevcut carts tablosu henüz oluşturulmadıysa user_id NOT NULL yapılacak.
-- Eğer carts tablosu zaten oluşturulduysa şema değişikliği yapılmayacak; 
-  bu karar yeni migration gerektirir.
-EK KARAR:
-
-carts tablosu yalnızca giriş yapmış kullanıcıların sepetleri için kullanılacak.
-
-- carts.user_id INT UNSIGNED NOT NULL olacak.
-- carts.user_id, users(id) tablosuna foreign key verecek.
-- Foreign key davranışı ON DELETE CASCADE olacak.
-- carts.session_id VARCHAR(128) NULL olarak kalacak.
-- session_id şu aşamada kullanılmayacak; ileride rezerve alandır.
-- 'user_id veya session_id en az biri dolu olmalı' kuralı kaldırılacak.
-- Yeni kural: carts.user_id her zaman dolu olmalıdır.
-- Misafir sepeti yalnızca PHP session içinde tutulacaktır.
-- Bu karar yalnızca carts tablosu henüz oluşturulmadıysa 011 migration'ında uygulanacak.
-- carts tablosu zaten oluşturulduysa şema değişikliği yapılmayacak; 
-  yeni bir migration ile ALTER TABLE yapılacak.
-
+Kararların tamamı için bkz. DECISIONS.md.
 
 ## Sıradaki Adım
 
-
-- Ardından `database/migrations/010_create_coupons.sql` dosyasının oluşturulması.
+- sıradaki adım Bölüm 5'te.

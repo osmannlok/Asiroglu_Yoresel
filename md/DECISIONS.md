@@ -45,7 +45,9 @@ Projenin belge hiyerarşisi şu şekilde olacak:
 - Migration sırası DATABASE-DEPENDENCIES.md dosyasına göre belirlenir.
 - Aynı kolon iki kez eklenmez.
 - Bir migration çalıştıysa dosyası değiştirilmez.
-- Yeni kolon eklemek için yeni bir migration yazılır.
+- database/migrate.php migration'ları dosya adı sırasıyla çalıştırır; başarılıları schema_migrations'a checksum ile kaydeder.
+- Çalışmış dosya değişirse migrate.php durur. Yeni dosya, uygulanmış son dosyadan sonra numaralandırılır.
+- MySQL'de DDL geri alınamaz; dosya ortasında hata olursa o dosya kaydedilmez ve oluşan tablolar elle temizlenir.
 
 ## Stok Kuralları
 
@@ -57,9 +59,9 @@ Projenin belge hiyerarşisi şu şekilde olacak:
 
 ## Sepet Kuralları
 
-- carts.user_id veya carts.session_id en az biri dolu olmalıdır.
-- Bu kural SQL CHECK ile uygulanmaz.
-- Kural Cart modelinde transaction içinde uygulanır.
+- carts yalnızca giriş yapmış kullanıcıların sepetleri içindir; carts.user_id her zaman dolu olmalıdır (NOT NULL).
+- carts.session_id rezerve alandır, şu aşamada kullanılmaz.
+- Misafir sepeti yalnızca PHP session'da tutulur (bkz. MİSAFİR SEPETİ).
 - cart_items.variant_key VIRTUAL generated column olur.
 - variant_key: IFNULL(product_variant_id, 0)
 - UNIQUE index: uq_cart_item_product (cart_id, product_id, variant_key)
@@ -111,10 +113,9 @@ Misafir sepeti yalnızca PHP session içinde tutulacaktır.
   özelliği için rezerve olarak kalacak.
 
 - carts tablosu yalnızca giriş yapmış kullanıcıların sepetleri için kullanılacak.
-- Bu nedenle carts.user_id alanı NOT NULL olacak şekilde değerlendirilecek.
-- Ancak mevcut carts tablosu henüz oluşturulmadıysa user_id NOT NULL yapılacak.
-- Eğer carts tablosu zaten oluşturulduysa şema değişikliği yapılmayacak; 
-  bu karar yeni migration gerektirir.
+- carts.user_id NOT NULL'dır. Uygulandı: 011 migration'ı hiçbir veritabanına uygulanmadan
+  önce (2026-10-31) bu karara göre düzeltildi; ALTER TABLE gerekmedi.
+- Uygulandı: 011 migration'ında (2026-10-31).
 
 ## Ödeme ve Kargo İlişkileri
 
@@ -150,9 +151,9 @@ Misafir sepeti yalnızca PHP session içinde tutulacaktır.
 
 ## Depo ve Dosya Yönetimi
 
-- Proje kökündeki dosyalar esastır.
-- md/ klasöründeki kopya dosyalar kullanılmaz.
-- md/ klasörü .gitignore'a eklenir veya içeriği docs/archive altına taşınır.
+- Proje belgeleri (DECISIONS.md, CLAUDE.md, PROJE-DURUMU.md, DATABASE-DEPENDENCIES.md,
+  TEST-COMMANDS.md, GEREKSİNİMLER.MD vb.) md/ klasöründe tutulur ve esastır (2026-10-31).
+- Belgelerin kopyası kökte veya başka klasörlerde tutulmaz.
 - storage/sessions/ Git takibine alınmaz.
   - .gitignore: storage/sessions/* ve !storage/sessions/.gitkeep
 - storage/logs/ Git takibine alınmaz.
@@ -167,18 +168,3 @@ Misafir sepeti yalnızca PHP session içinde tutulacaktır.
 - Proxy uyumu ayrı bir güvenlik görevi olarak planlanır ve admin rate limiting'den önce çözülmelidir.
 - Güvenlik başlıkları, SRI ve 405 yanıtı düzeltmesi ayrı görevlerde yapılır.
 
-EK KARAR:
-
-carts tablosu yalnızca giriş yapmış kullanıcıların sepetleri için kullanılacak.
-
-- carts.user_id INT UNSIGNED NOT NULL olacak.
-- carts.user_id, users(id) tablosuna foreign key verecek.
-- Foreign key davranışı ON DELETE CASCADE olacak.
-- carts.session_id VARCHAR(128) NULL olarak kalacak.
-- session_id şu aşamada kullanılmayacak; ileride rezerve alandır.
-- 'user_id veya session_id en az biri dolu olmalı' kuralı kaldırılacak.
-- Yeni kural: carts.user_id her zaman dolu olmalıdır.
-- Misafir sepeti yalnızca PHP session içinde tutulacaktır.
-- Bu karar yalnızca carts tablosu henüz oluşturulmadıysa 011 migration'ında uygulanacak.
-- carts tablosu zaten oluşturulduysa şema değişikliği yapılmayacak; 
-  yeni bir migration ile ALTER TABLE yapılacak.

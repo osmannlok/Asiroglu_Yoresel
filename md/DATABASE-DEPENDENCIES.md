@@ -2,34 +2,36 @@
 
 > Migration sırasının tek kaynağı bu dosyadır.
 > Mimari kararlar için `DECISIONS.md` önceliklidir.
-> Son güncelleme: 2026-10-31 (FK listesi tamamlandı)
+>Son güncelleme: 2026-10-31 (010–018 yazıldı; dosya adları eklendi)
 
 ## Migration Sırası
 
-001 users
-002 addresses
-003 categories
-004 brands
-005 products
-006 product_images
-007 product_variants
-008 attributes, attribute_values, product_attributes
-009 stock_movements
-010 coupons, coupon_usages
-011 carts, cart_items
-012 orders, order_items, order_status_history + coupon_usages.order_id FK
-013 payments, payment_logs
-014 shipping_methods, shipments
-015 return_requests
-016 reviews, wishlists
-017 banners, pages, newsletter_subscribers, contact_messages
-018 settings, activity_logs
+001 users                          001_create_users.sql
+002 addresses                      002_create_addresses.sql
+003 categories                     003_create_categories.sql
+004 brands                         004_create_brands.sql
+005 products                       005_create_products.sql
+006 product_images                 006_create_product_images.sql
+007 product_variants               007_create_product_variants.sql
+008 attributes, attribute_values, product_attributes   008_create_attributes.sql
+009 stock_movements                009_create_stock_movements.sql
+010 coupons, coupon_usages         010_create_coupons.sql
+011 carts, cart_items              011_create_carts.sql
+012 orders, order_items, order_status_history + coupon_usages.order_id FK   012_create_orders.sql
+013 payments, payment_logs         013_create_payments.sql
+014 shipping_methods, shipments    014_create_shipping.sql
+015 return_requests                015_create_return_requests.sql
+016 reviews, wishlists             016_create_reviews_wishlists.sql
+017 banners, pages, newsletter_subscribers, contact_messages   017_create_content_tables.sql
+018 settings, activity_logs        018_create_settings.sql
 
 ## Foreign Key Bağımlılıkları
 
 Biçim: `tablo.kolon → hedef_tablo.kolon` | ON DELETE davranışı | tanımlandığı migration
 
-### Mevcut migration'lar (001–009)
+### Mevcut migration'lar 
+### Migration'lar 001–009 (uygulanmış sayılır)
+### Migration'lar 010–018 (yazıldı; henüz veritabanına uygulanmadı)
 
 | Foreign key | ON DELETE | Migration |
 |---|---|---|
@@ -87,7 +89,7 @@ Not: ON DELETE değerleri `database-schema.sql` referansından alınmıştır. `
 
 - stock_movements.reference_id: Birden çok tabloya işaret edebildiği için (reference_type ile birlikte).
 - activity_logs.entity_id: Aynı gerekçe (entity_type ile birlikte).
-- carts.session_id: Oturum kimliğidir, tabloya bağlı değildir.
+- carts.session_id: Oturum kimliğidir, tabloya bağlı değildir.Rezerve alan; şu aşamada kullanılmaz (misafir sepeti yalnızca PHP session'da).
 - payments.order_id ve shipments.order_id UNIQUE değildir. Gerekçe: bir siparişte birden fazla ödeme denemesi ve parçalı gönderim olabilir.
 
 ## FK İçermeyen Tablolar
@@ -103,17 +105,17 @@ users, brands, attributes, coupons, shipping_methods, banners, pages, newsletter
 - cart_items UNIQUE index: uq_cart_item_product (cart_id, product_id, variant_key).
 - cart_items.product_variant_id FK: ON DELETE CASCADE.
 - order_items.product_id ve order_items.product_variant_id FK: ON DELETE SET NULL.
-- orders.customer_email VARCHAR(191) NOT NULL, orders.customer_phone VARCHAR(20) NULL. idx_orders_customer_email indeksi bulunur.
-- coupons.deleted_at DATETIME NULL alanı 010'da eklenir.
-- Bir migration çalıştıysa dosyası değiştirilmez. Yeni kolon için yeni migration yazılır.
+- orders.customer_email VARCHAR(191) NOT NULL, orders.customer_phone VARCHAR(20) NULL. idx_orders_customer_email indeksi bulunur.  (012'de uygulandı).
+- coupons.deleted_at DATETIME NULL alanı 010'da eklendi.
+- Bir migration çalıştıysa dosyası değiştirilmez. Yeni kolon için yeni migration yazılır.  migrate.php, çalışmış dosyaların SHA-256 checksum'unu schema_migrations'ta saklar; değişiklik varsa durur.
+- carts.user_id INT UNSIGNED NOT NULL (FK users, CASCADE). carts.session_id VARCHAR(128) NULL, rezerve ve kullanılmaz.
+- 010, 011 ve 012 hiçbir veritabanına uygulanmadan önce (2026-10-31) düzeltildi. Bu dosyalar ilk migrate.php çalıştırmasından sonra değiştirilemez.
 - Kaynak şema database/migrations klasörüdür. database-schema.sql yalnızca başlangıç referansıdır ve doğrudan çalıştırılmamalıdır.
 
 ## (karar VERİLEN KONULAR)
 
 1. schema_migrations tablosu, planlanan 31 uygulama tablosuna dahil değildir.
-   Bu tabloyu database/migrate.php kendisi otomatik oluşturacak.
-   migrate.php, migration'ları sırayla çalıştıracak, başarıyla çalışanları 
-   schema_migrations tablosuna kaydedecek ve aynı dosyayı tekrar çalıştırmayacak.
+   Bu tabloyu database/migrate.php otomatik oluşturur (kolonlar: id, migration, checksum, executed_at). Migration'ları sırayla çalıştırır, başarılı olanları kaydeder, aynı dosyayı tekrar çalıştırmaz.
 
 2. Rol modeli olarak users.user_type ENUM('customer','admin','staff') korunacak.
    roles, permissions, role_permissions ve user_roles tabloları şu aşamada 

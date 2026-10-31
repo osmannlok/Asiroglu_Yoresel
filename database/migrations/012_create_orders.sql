@@ -11,11 +11,13 @@
 --
 --    İş kuralları (Order modelinde uygulanır):
 --    - order_number benzersiz ve okunabilir üretilir: ASY-20261030-000123
---    - Sipariş oluşturma, stok düşürme, kupon kullanım kaydı ve sepetin
---      'converted' yapılması aynı transaction içinde yapılır.
+--    - Sipariş oluşturma, stok düşürme, kupon kullanım kaydı (+ coupons.used_count
+--      artırımı) ve sepetin 'converted' yapılması aynı transaction içinde yapılır.
 --    - Ödeme başarısız olursa sipariş silinmez, 'payment_failed' olur.
---    - İptalde stok geri eklenir.
+--    - İptalde stok geri eklenir; kupon kullanım kaydı silinir ve used_count azaltılır.
 --    - Her durum değişikliği order_status_history tablosuna yazılır.
+--    - Misafir siparişleri customer_email (zorunlu) ve customer_phone
+--      (isteğe bağlı) alanlarıyla takip edilir.
 -- -----------------------------------------------------------------------------
 CREATE TABLE orders (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -28,6 +30,11 @@ CREATE TABLE orders (
 
     -- Siparişe uygulanan kupon; yoksa NULL
     coupon_id INT UNSIGNED NULL,
+
+    -- Müşteri iletişim bilgisi (üye ve misafir siparişlerinde sipariş anında
+    -- alınır). Misafir siparişleri bu alanlarla takip edilir.
+    customer_email VARCHAR(191) NOT NULL,
+    customer_phone VARCHAR(20) NULL,
 
     status ENUM(
         'pending',
@@ -76,6 +83,7 @@ CREATE TABLE orders (
 
     -- order_number UNIQUE olduğu için ayrıca indeks yazılmadı
     INDEX idx_orders_user (user_id),
+    INDEX idx_orders_customer_email (customer_email),
     INDEX idx_orders_status (status),
     INDEX idx_orders_payment_status (payment_status),
     INDEX idx_orders_created (created_at)
