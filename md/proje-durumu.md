@@ -33,6 +33,11 @@
 - [x] `app/Views/layouts/admin.php` (sidebar, üst bar, toast, onay modalı) yazıldı
 - [x] `app/Controllers/Admin/DashboardController.php` yazıldı
 - [ ] Yukarıdaki dosyalarda `php -l` ve geçici test betikleri henüz çalıştırılmadı (çalıştırınca [x] yapın)
+- [x] `app/Views/admin/dashboard/index.php` yazıldı (2026-10-31)
+- [x] `App.php`: korumalı `/admin` grubu (AdminMiddleware) ve `GET /admin` route'u eklendi
+- [x] Kategori modülü yazıldı: `Admin/CategoryController.php`, `admin/categories/index.php`, `admin/categories/form.php`; 6 kategori route'u `App.php`'de
+- [x] `Admin/BrandController.php` ve `admin/brands/index.php` yazıldı
+- [ ] `admin/brands/form.php` ve marka route'ları (App.php) bekliyor
 
 ## 3. Oluşturulan Migration Dosyaları
 
@@ -65,12 +70,20 @@ Toplam: 18 migration dosyası, 31 uygulama tablosu (schema_migrations hariç).
 - `Category`: soft delete, `findBySlug`, `getActiveTree`, `paginate`, `slugExists`, `wouldCreateCycle`, `hasChildren`, `hasActiveProducts`; `update()` döngü kontrolü yapar
 - `Brand`: soft delete, `findBySlug`, `getActive`, `paginate`, `slugExists`, `hasActiveProducts`
 - `User`: soft delete; `create()` kapalı, kullanıcı yalnızca `createUser()` ile oluşturulur; `verifyCredentials`, `findActiveById`, `findByEmail`, `emailExists`, `changePassword`, `updateProfile`; `find()`/`all()` çıktısında `password_hash` ve `remember_token` yoktur; `update()` `user_type` ve `password_hash` yazmayı reddeder
+- `Auth` (App\Core): oturumda yalnızca kullanıcı ID'si; `login`, `logout`, `user`, `check`, `guest`, `isAdmin`, `canAccessAdmin`
+
+- `Admin\AuthController`, `Admin\DashboardController`, `Admin\CategoryController`, `Admin\BrandController`
+- View: `admin/auth/login`, `admin/dashboard/index`, `admin/categories/{index,form}`, `admin/brands/index`; layout: `layouts/main`, `layouts/admin`
+- Middleware: `AdminMiddleware`
+
 
 ## 5. Sıradaki Dosya
 
-- `CLAUDE.md` düzeltmesi (durum adları, `stocks` ve `logs` tabloları, `DECISIONS.md` ile uyum)
-
-Ardından sırayla: `app/Views/home/index.php` → `database/migrate.php` (yoksa) → `database/migrations/010_create_coupons.sql`.
+1. `app/Views/admin/brands/form.php`
+2. `App.php` içine marka route'ları (6 adet, /admin grubunun içine)
+3. `php -l` ve elle test: dashboard, kategori, marka akışları
+4. `CLAUDE.md` düzeltmesi (bkz. CLAUDE.md değişiklikleri)
+5. Ürün modeli (`Product`), ardından ürün CRUD
 
 ## 6. Bekleyen Migration Dosyaları
 
@@ -82,7 +95,7 @@ Bekleyen migration yazımı yok (001–018 yazıldı). Bekleyen iş: 010–018'i
 1. **Kupon sayacı:** `coupons.used_count` korunur. `coupon_usages` kaydı eklenirken `used_count` aynı transaction içinde artırılır. Sipariş iptalinde kullanım kaydı silinirken `used_count` azaltılır. Limit kontrolünde `COUNT(*)` yerine `used_count` kullanılır.
 2. **Kupon silme:** Kuponlar fiziksel silinmez. Admin panelinde yalnızca `is_active = 0` veya `deleted_at` doldurma kullanılır. Kupon sorgularında `deleted_at IS NULL` koşulu zorunludur.
 3. **Şema kaynağı:** `database-schema.sql` yalnızca başlangıç referansıdır. Gerçek ve güncel veritabanı kaynağı `database/migrations` klasörüdür.
-4. **`md/` klasörü:** Kopya dosyalar kullanılmaz. Proje kökündeki dosyalar esastır. `md/` klasörü `.gitignore`'a eklenir veya içeriği `docs/archive` altına taşınır.
+4. **`md/` klasörü:** "md/ klasörü: Proje belgeleri md/ altında tutulur ve esastır (DECISIONS.md). Köktekiler kopyadır, kullanılmaz veya silinir."
 5. **Oturum dosyaları:** `storage/sessions/` Git takibine alınmaz. `.gitignore`: `storage/sessions/*` ve `!storage/sessions/.gitkeep`.
 6. **Log dosyaları:** `storage/logs/` Git takibine alınmaz. `.gitignore`: `storage/logs/*` ve `!storage/logs/.gitkeep`.
 7. **Ortam dosyası:** `.env` Git takibine alınmaz. `.gitignore`'a `.env` satırı eklenir.
@@ -97,14 +110,18 @@ Bekleyen migration yazımı yok (001–018 yazıldı). Bekleyen iş: 010–018'i
 16. **Middleware:** `handle(Request): ?Response` sözleşmesi; `null` = devam, `Response` = zincir durur. Geçersiz middleware tanımı istekten geçirilmez, hata fırlatır (500). Admin route'ları `Router::group()` ile korunur; giriş route'ları grubun dışında kalır.
 17. **Slug/e-posta benzersizliği:** UNIQUE indeksler soft delete'li kayıtları da kapsadığı için `slugExists()` ve `emailExists()` silinmiş kayıtları da sayar.
 18. **Silme kuralları:** Silinmemiş ürünü veya alt kategorisi olan kategori, silinmemiş ürünü olan marka silinemez (önce pasifleştirilir).
-
+19. **Slug üretimi (kategori, marka):** Boşsa addan üretilir (Türkçe karakterler sadeleştirilir) ve çakışırsa -2, -3 eklenir. Elle girilen slug çakışırsa alan hatası verilir. Eşzamanlı çakışma (MySQL 1062) alan hatasına çevrilir.
+20. **Form hatası akışı:** Hata durumunda `old` ve `form_errors` flash'a yazılır, forma yönlendirilir (şifre benzeri alan flash'a yazılmaz).
+21. **Silme:** Silme işlemleri soft delete; POST + CSRF + ortak onay modalı. `admin` ve `staff` ikisi de silebilir (ayrı kısıt kararı yok; gerekirse sonradan `isAdmin()` ile daraltılır).
+22. **Görsel/logo:** `Uploader` yazılana kadar kategori görseli ve marka logosu formlarda yoktur.
 
 ## 8. Bilinen Riskler
 
 ### Kritik
 
-- `app/Views/home/index.php` bozuk: PHP/HTML yerine klasör ağacı metni içeriyor.
-- `database/migrate.php` doğrulanamadı veya yok. `TEST-COMMANDS.md` migration komutları bu dosyaya dayanıyor.
+- app/Models/Auth.php yolu: sınıf App\Core\Auth ama dosya app/Models/ altında görünüyor. Autoloader app/Core/Auth.php arar; taşınmazsa /admin 500 verir.
+- app/Middleware/AuthMiddleware.php içinde AdminMiddleware sınıfı tanımlı; AdminMiddleware.php’nin kopyası. Silinmeli.
+- .env içeriği (DB şifresi dahil) sohbete yüklendi. Şifre değiştirilmeli. .env projeden yüklenen dosyalardan çıkarılmalı.
 - DECISIONS.md kendi içinde çelişiyor: "Sepet Kuralları" bölümü eski kuralı (user_id veya session_id) söylüyor. Bkz. DECISIONS.md 3.1.
 - İkinci bir spesifikasyon seti (`GEREKSİNİMLER.MD`, `00-PROJE-TALİMATI.MD`, `02`, `03`, `04`) mevcut şema ile çelişiyor ve `gereksinimler.md`'yi "tek doğruluk kaynağı" ilan ediyor. Farklar: `roles`/`permissions` tabloları, `order_addresses`/`order_shipments`, varyant `price_difference`, varyant `critical_stock_quantity`, ayrı iade durumları, alan adları (`name`/`sale_price`/`tax_rate`/`stock`), `resources/views` ve `Services`/`Repositories` klasörleri. Hangi belge setinin geçerli olduğu netleşmeli.
 - `storage/sessions` dosyaları Git'e girmiş olabilir. `git ls-files storage .env` ile kontrol edilmeli, gerekirse `git rm --cached` uygulanmalı. `.gitignore` doğrulanamadı.
@@ -125,7 +142,7 @@ Bekleyen migration yazımı yok (001–018 yazıldı). Bekleyen iş: 010–018'i
 - `Request::ip()` proxy veya Cloudflare arkasında yanlış IP verir. Admin rate limiting'den önce çözülmeli.
 - Yeni dosyalarda `php -l` ve geçici test betikleri çalıştırılmadı; `tmp_*.php` dosyaları işiniz bitince silinmeli (özellikle `tmp_create_admin.php`).
 - `Router::normalizePath()` artık ardışık `/` karakterlerini tek `/` yapıyor; `/admin//x` ile `/admin/x` aynı route'a eşleşir.
-- Menüdeki `/admin/kategoriler` ve `/admin/markalar` bağlantıları controller'lar yazılana kadar 404 verir.
+
 
 ### Düşük
 
@@ -140,6 +157,7 @@ Bekleyen migration yazımı yok (001–018 yazıldı). Bekleyen iş: 010–018'i
 
 - 2026-10-31 (010–018 ve migrate.php sonrası)
 - 2026-10-31 (Category, Brand, User, Auth, AdminMiddleware, Router, admin giriş ve layout dosyaları; php -l henüz çalıştırılmadı)
+2026-10-31 (dashboard view, kategori ve marka dosyaları yazıldı; php -l çalıştırılmadı).
 
 ## Teknik Kararlar
 
@@ -154,7 +172,8 @@ Kararların tamamı için bkz. DECISIONS.md.
 
 ## Sıradaki Adım
 
-1. `app/Views/admin/dashboard/index.php`
-2. `App.php` içinde korumalı `/admin` grubu (`AdminMiddleware` ile `GET /admin` → `DashboardController::index`)
-3. `CLAUDE.md` düzeltmesi (misafir sepeti DB'de yazıyor; DECISIONS.md'ye göre yalnızca session)
-4. `Admin/CategoryController` ve view'ları, ardından `Admin/BrandController`
+1. `app/Views/admin/brands/form.php`
+2. `App.php` içine marka route'ları (6 adet, /admin grubunun içine)
+3. `php -l` ve elle test: dashboard, kategori, marka akışları
+4. `CLAUDE.md` düzeltmesi (bkz. CLAUDE.md değişiklikleri)
+5. Ürün modeli (`Product`), ardından ürün CRUD

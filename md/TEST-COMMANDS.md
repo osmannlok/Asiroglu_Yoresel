@@ -36,6 +36,12 @@ php -l app/Controllers/Admin/AuthController.php
 php -l app/Controllers/Admin/DashboardController.php
 php -l app/Views/admin/auth/login.php
 php -l app/Views/layouts/admin.php
+php -l app/Controllers/Admin/CategoryController.php
+php -l app/Controllers/Admin/BrandController.php
+php -l app/Views/admin/dashboard/index.php
+php -l app/Views/admin/categories/index.php
+php -l app/Views/admin/categories/form.php
+php -l app/Views/admin/brands/index.php
 
 ### Tüm PHP dosyalarını tek seferde tara
 
@@ -46,8 +52,7 @@ bu dosya için sözdizimi kontrolü atlanır veya kullanıcı kendisi çalışt�
 
 ## Migration Kontrolü
 
-php database/migrate.php --status
-php database/migrate.php
+- Uygulanan migration'lar 001–018'dir (migrate.php yazıldı).
 
 Beklenen durum:
 - Uygulanan migration'lar 001–009'dur (migration 010 yazılana kadar).
@@ -60,7 +65,7 @@ Beklenen durum:
 SELECT COUNT(*) FROM information_schema.tables
 WHERE table_schema = DATABASE();
 
-Beklenen: 001–009 sonrası 11 uygulama tablosu (+ `schema_migrations` varsa 12). Planlanan toplam 31 uygulama tablosudur.
+001–018 sonrası 31 uygulama tablosu (+ schema_migrations ile 32).
 
 ### Tablo listesi
 
@@ -94,3 +99,12 @@ git ls-files storage .env
 
 Çıktıda `storage/sessions/sess_*`, `storage/logs/*` veya `.env` görünüyorsa:
 git rm --cached <dosya>
+
+## Elle Test: Admin Akışı
+
+1. Girişsiz `/admin` → `/admin/giris`'e yönlendirir
+2. Admin ile giriş → `/admin` açılır; kategori/marka sayaçları görünür
+3. Müşteri hesabıyla `/admin/giris` → "E-posta veya şifre hatalı."
+4. Kategori: ekle, aynı slug ile ikinci kayıt (hata), düzenle (kendi slug'ı hata vermemeli), alt kategorili kategoriyi sil (reddedilmeli)
+5. Marka: aynı akış; `javascript:` ile başlayan web sitesi reddedilmeli
+6. CSRF'siz POST → 419

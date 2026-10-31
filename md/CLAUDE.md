@@ -91,7 +91,11 @@ ashiroglu-market/
 │   │       ├── OrderController.php
 │   │       ├── CustomerController.php
 │   │       ├── CouponController.php
+│   │       ├── AuthController.php
+│   │       ├── BrandController.php
 │   │       └── SettingController.php
+│   ├── Middleware/
+│   │       └── AdminMiddleware.php
 │   ├── Models/
 │   │   ├── User.php
 │   │   ├── Address.php
@@ -210,8 +214,9 @@ Planlanan 31 uygulama tablosu:
 
 ## Sepet ve Sipariş Kuralları
 
-- Misafir sepeti `carts.session_id` ile, üye sepeti `carts.user_id` ile veritabanında tutulur.
-- `carts.user_id` veya `carts.session_id` en az biri dolu olmalıdır. Bu kural SQL CHECK ile değil, Cart modelinde transaction içinde uygulanır.
+- Misafir sepeti yalnızca PHP session'da tutulur (`$_SESSION['cart']`); veritabanına carts/cart_items kaydı açılmaz.
+- `carts` yalnızca giriş yapmış kullanıcılar içindir; `carts.user_id` NOT NULL'dır. `carts.session_id` rezerve alandır, kullanılmaz.
+- Giriş yapınca session sepeti kullanıcının DB sepetiyle transaction içinde birleştirilir (aynı ürün+varyantta adetler toplanır, stok sınırı aşılmaz).
 - Kullanıcı giriş yaptığında misafir sepeti üye sepetiyle birleştirilir.
 - `cart_items.variant_key` VIRTUAL generated column'dur: `IFNULL(product_variant_id, 0)`. UNIQUE index: `uq_cart_item_product (cart_id, product_id, variant_key)`.
 - Sepet işlemleri Fetch API ile AJAX üzerinden yapılacak.
@@ -258,7 +263,7 @@ Planlanan 31 uygulama tablosu:
 - Session cookie’lerinde `HttpOnly`, `Secure` ve `SameSite` ayarları kullanılacak.
 - Admin paneline yalnızca yetkili kullanıcılar erişebilecek.
 - Yetkilendirme `users.user_type` ENUM ile yönetilir: panel erişimi `admin` ve `staff`, tam yönetici yetkisi yalnızca `admin`. `roles` ve `permissions` tabloları şu aşamada yoktur.
-- Admin girişinde brute-force koruması için rate limiting uygulanacak.
+- Admin girişinde brute-force koruması için rate limiting uygulanacak.(henüz yok; Request::ip() proxy düzeltmesinden sonra. Bu çözülene kadar sunucu internete açılmaz.)
 - Dosya yüklemelerinde uzantı, MIME tipi, dosya boyutu ve gerçek içerik kontrolü yapılacak.
 - Yüklenen dosyalara rastgele ve güvenli dosya adı verilecek.
 - Production ortamında hata detayları kullanıcıya gösterilmeyecek.
@@ -336,7 +341,7 @@ Claude aşağıdaki sırayı takip edecektir:
 
 1. MVC çekirdek altyapısı (tamamlandı)
 2. Veritabanı migration dosyaları (001–018 tamamlandı)
-3. Kategori ve marka yönetimi (modeller ve admin kimlik doğrulama altyapısı tamamlandı; controller ve view’lar bekliyor)
+3. Kategori ve marka yönetimi (controller ve index view'ları tamamlandı; marka form view'ı ve marka route'ları bekliyor).
 4. Ürün yönetimi
 5. Ürün görselleri ve varyantlar
 6. Stok yönetimi

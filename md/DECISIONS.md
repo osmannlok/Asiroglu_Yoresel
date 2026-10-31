@@ -169,3 +169,11 @@ Misafir sepeti yalnızca PHP session içinde tutulacaktır.
 - Proxy uyumu ayrı bir güvenlik görevi olarak planlanır ve admin rate limiting'den önce çözülmelidir.
 - Güvenlik başlıkları, SRI ve 405 yanıtı düzeltmesi ayrı görevlerde yapılır.
 
+## Yönetim Paneli Kuralları
+
+- Tüm admin route'ları `/admin` prefix'li `AdminMiddleware` grubunun içindedir. Yalnızca giriş/çıkış grubun dışındadır.
+- Panel erişimi `admin` ve `staff`; tam yönetici yetkisi yalnızca `admin`.
+- Slug: boşsa addan üretilir ve benzersizleştirilir; elle girilen çakışırsa hata. UNIQUE indeks soft delete'li kayıtları da kapsar.
+- Silme soft delete'tir. Alt kategorisi veya silinmemiş ürünü olan kategori, silinmemiş ürünü olan marka silinemez; önce pasifleştirilir.
+- Kategori/marka görseli Uploader yazılana kadar kapsam dışıdır.
+- Admin CRUD ekranları: POST + CSRF, silme için ortak onay modalı, hata durumunda eski girdi flash ile taşınır.

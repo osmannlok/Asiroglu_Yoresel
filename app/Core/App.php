@@ -12,6 +12,8 @@ declare(strict_types=1);
 namespace App\Core;
 
 use App\Controllers\Admin\AuthController as AdminAuthController;
+use App\Controllers\Admin\CategoryController;
+use App\Controllers\Admin\DashboardController;
 use App\Controllers\HomeController;
 use App\Middleware\AdminMiddleware;
 use Throwable;
@@ -93,14 +95,22 @@ final class App
         $this->router->post('/admin/cikis', [AdminAuthController::class, 'logout']);
 
         // --- Yönetim paneli: korumalı route'lar -----------------------------
-        // Dashboard, kategori, marka vb. route'lar şu grubun İÇİNE eklenecektir:
-        //
-        // $this->router->group(
-        //     ['prefix' => '/admin', 'middleware' => [AdminMiddleware::class]],
-        //     function (Router $router): void {
-        //         $router->get('/', [DashboardController::class, 'index']);
-        //     }
-        // );
+        // Marka, ürün vb. yeni admin route'ları bu grubun İÇİNE eklenir.
+        // Grup içindeki yollar "/admin" önekiyle birleşir ('/' => '/admin').
+        $this->router->group(
+            ['prefix' => '/admin', 'middleware' => [AdminMiddleware::class]],
+            function (Router $router): void {
+                $router->get('/', [DashboardController::class, 'index']);
+
+                // Kategoriler (FR-030, FR-031, FR-033)
+                $router->get('/kategoriler', [CategoryController::class, 'index']);
+                $router->get('/kategoriler/olustur', [CategoryController::class, 'create']);
+                $router->post('/kategoriler', [CategoryController::class, 'store']);
+                $router->get('/kategoriler/{id:\d+}/duzenle', [CategoryController::class, 'edit']);
+                $router->post('/kategoriler/{id:\d+}/guncelle', [CategoryController::class, 'update']);
+                $router->post('/kategoriler/{id:\d+}/sil', [CategoryController::class, 'destroy']);
+            }
+        );
     }
 
     /**
