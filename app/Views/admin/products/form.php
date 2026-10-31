@@ -62,6 +62,17 @@ $isNew            = !empty($values['is_new']);
     <a href="<?= $this->e($this->url($listPath)) ?>" class="btn btn-outline-secondary">Listeye Dön</a>
 </div>
 
+<?php if ($isEdit && !empty($productId)): ?>
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        <a href="<?= $this->e($this->url($listPath . '/' . (int) $productId . '/gorseller')) ?>"
+           class="btn btn-outline-primary btn-sm">Görseller</a>
+        <a href="<?= $this->e($this->url($listPath . '/' . (int) $productId . '/varyantlar')) ?>"
+           class="btn btn-outline-primary btn-sm">
+            Varyantlar<?= $hasVariants ? ' (var)' : '' ?>
+        </a>
+    </div>
+<?php endif; ?>
+
 <form id="productForm" method="post" action="<?= $this->e($this->url($formAction)) ?>" novalidate>
     <?= $this->csrfField() ?>
 

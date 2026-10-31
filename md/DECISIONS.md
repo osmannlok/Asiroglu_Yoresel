@@ -186,6 +186,16 @@ Misafir sepeti yalnızca PHP session içinde tutulacaktır.
   - Vitrinde pasif/silinmiş kategori veya markadaki ürünler listelenmez.
   - Fiyat girişinde ondalık ayırıcı nokta; virgül kabul edilmez.
 
+  ## Stok Hareketi Kuralları
+
+  - stock_movements yalnızca eklenir; güncelleme ve silme yoktur.
+  - Stok değişikliği ve hareket kaydı aynı transaction içinde yapılır; stok satırı FOR UPDATE ile kilitlenir.
+  - Stok negatife düşemez; çıkış mevcut stoğu aşamaz.
+  - Manuel harekette işlem nedeni zorunludur (FR-026).
+  - correction türünde girilen değer hedef stoktur; kaydedilen quantity farkın mutlak değeridir.
+  - Formdan yalnızca incoming, outgoing, return, correction kabul edilir; reservation sistem kaynaklıdır.
+  - Varyantı olan ürüne varyantsız hareket yazılamaz.
+
   ## Görsel Yükleme Kuralları
 
   - Uploader (App\Core): jpg, jpeg, png, webp; en fazla 2 MB ve 6000x6000 px.
@@ -193,3 +203,5 @@ Misafir sepeti yalnızca PHP session içinde tutulacaktır.
   - Dosya adı rastgele üretilir; DB'ye yalnızca göreli yol yazılır.
   - Hedef klasör beyaz listeden gelir: products, categories, brands, banners.
   - Üründe tek ana görsel; ilk görsel otomatik ana olur.
+  - Ürün başına en fazla 10 görsel yüklenebilir.
+  - Kayıt başarısız olursa o istekte yüklenen dosyalar silinir; görsel silinirken önce DB kaydı, sonra dosya kaldırılır.

@@ -16,11 +16,11 @@ use App\Controllers\Admin\BrandController;
 use App\Controllers\Admin\CategoryController;
 use App\Controllers\Admin\DashboardController;
 use App\Controllers\Admin\ProductController;
-use App\Controllers\HomeController;
-use App\Middleware\AdminMiddleware;
-use App\Controllers\Admin\ProductController;
+use App\Controllers\Admin\ProductImageController;
 use App\Controllers\Admin\ProductVariantController;
 use App\Controllers\HomeController;
+use App\Controllers\Admin\StockController;
+use App\Middleware\AdminMiddleware;
 use Throwable;
 
 final class App
@@ -130,8 +130,15 @@ final class App
                 $router->get('/urunler/{id:\d+}/duzenle', [ProductController::class, 'edit']);
                 $router->post('/urunler/{id:\d+}/guncelle', [ProductController::class, 'update']);
                 $router->post('/urunler/{id:\d+}/sil', [ProductController::class, 'destroy']);
-            
-                                $router->post('/urunler/{id:\d+}/sil', [ProductController::class, 'destroy']);
+
+                // Ürün görselleri (FR-012, FR-013, FR-014)
+                // "sirala" sabit yoludur; {gid:\d+} kısıtlı yollarla çakışmaz.
+                $router->get('/urunler/{id:\d+}/gorseller', [ProductImageController::class, 'index']);
+                $router->post('/urunler/{id:\d+}/gorseller', [ProductImageController::class, 'store']);
+                $router->post('/urunler/{id:\d+}/gorseller/sirala', [ProductImageController::class, 'reorder']);
+                $router->post('/urunler/{id:\d+}/gorseller/{gid:\d+}/ana', [ProductImageController::class, 'setMain']);
+                $router->post('/urunler/{id:\d+}/gorseller/{gid:\d+}/alt', [ProductImageController::class, 'updateAlt']);
+                $router->post('/urunler/{id:\d+}/gorseller/{gid:\d+}/sil', [ProductImageController::class, 'destroy']);
 
                 // Ürün varyantları (FR-020, FR-021, FR-022, FR-025)
                 $router->get('/urunler/{id:\d+}/varyantlar', [ProductVariantController::class, 'index']);
@@ -140,6 +147,12 @@ final class App
                 $router->get('/urunler/{id:\d+}/varyantlar/{vid:\d+}/duzenle', [ProductVariantController::class, 'edit']);
                 $router->post('/urunler/{id:\d+}/varyantlar/{vid:\d+}/guncelle', [ProductVariantController::class, 'update']);
                 $router->post('/urunler/{id:\d+}/varyantlar/{vid:\d+}/durum', [ProductVariantController::class, 'toggle']);
+
+                // Stok (FR-023, FR-024, FR-026)
+                $router->get('/stok', [StockController::class, 'index']);
+                $router->get('/stok/hareket', [StockController::class, 'create']);
+                $router->post('/stok/hareket', [StockController::class, 'store']);
+                $router->get('/stok/gecmis', [StockController::class, 'history']);
             }
         );
     }

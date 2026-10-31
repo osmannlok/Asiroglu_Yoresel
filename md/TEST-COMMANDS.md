@@ -52,6 +52,14 @@ php -l app/Models/ProductImage.php
 php -l app/Models/ProductVariant.php
 php -l app/Controllers/Admin/ProductVariantController.php
 php -l app/Views/admin/products/variants/index.php
+php -l app/Controllers/Admin/ProductImageController.php
+php -l app/Views/admin/products/images/index.php
+php -l app/Views/admin/products/variants/form.php
+php -l app/Models/StockMovement.php
+php -l app/Controllers/Admin/StockController.php
+php -l app/Views/admin/stock/index.php
+php -l app/Views/admin/stock/form.php
+php -l app/Views/admin/stock/history.php
 
 ### Tüm PHP dosyalarını tek seferde tara
 
@@ -109,8 +117,6 @@ git rm --cached <dosya>
 
 ## Elle Test: Admin Akışı
 
-Ön koşul: `app/Core/Auth.php` yerinde olmalı (`mv app/Models/Auth.php app/Core/Auth.php`) ve
-`app/Middleware/AuthMiddleware.php` silinmiş olmalı. Aksi halde `/admin` 500 verir.
 
 1. Girişsiz `/admin` → `/admin/giris`'e yönlendirir
 2. Admin ile giriş → `/admin` açılır; kategori/marka sayaçları görünür
@@ -136,4 +142,17 @@ git rm --cached <dosya>
    - Başka ürünün varyant ID'siyle `/urunler/{id}/varyantlar/{vid}/duzenle` (listeye "Varyant bulunamadı." ile dönmeli)
    - Listede anahtarı kapat/aç: sayfa yenilenmemeli, toast görünmeli; ağ hatasında anahtar eski haline dönmeli
    - Varyant eklenince ürün listesinde "Varyantlı (n)" rozeti görünmeli 
-8. CSRF'siz POST → 419
+8. Görsel: `/admin/urunler/{id}/gorseller`
+   - JPG yükle (ilk görsel otomatik "Ana görsel" olmalı); `.php` uzantılı veya 2 MB üzeri dosya (reddedilmeli)
+   - 10 görselden fazlası (reddedilmeli)
+   - "Ana yap", alt metin kaydet, Yukarı/Aşağı sıralama (sayfa yenilenmeden; ağ hatasında eski sıraya dönmeli)
+   - Ana görseli sil: sıradaki görsel ana olmalı, dosya `public/uploads/products/` altından kalkmalı
+   - Başka ürünün görsel ID'siyle `/gorseller/{gid}/sil` (reddedilmeli)
+9. Stok: `/admin/stok`
+   - Stok 0 → "Tükendi", ≤ eşik → "Kritik"; varyantlı üründe satırlar varyant olmalı
+   - Giriş +10, çıkış -3: geçmişte `önce → sonra` doğru, ürün stoğu güncellenmeli
+   - Mevcut stoktan fazla çıkış (reddedilmeli); nedensiz hareket (reddedilmeli)
+   - Düzeltme: hedef stok mevcutla aynıysa reddedilmeli; farklıysa fark kaydedilmeli
+   - Varyantlı ürüne varyantsız hareket (reddedilmeli, form listesinde zaten çıkmaz)
+   - Geçmiş filtresi ve sayfalamada filtrenin korunması
+10. CSRF'siz POST → 419

@@ -41,12 +41,16 @@
 - [x] Ürün modülü yazıldı (2026-10-31): `Models/Product.php`, `Admin/ProductController.php`, `admin/products/index.php`, `admin/products/form.php`; 6 ürün route'u `App.php`'de; menüye "Ürünler" eklendi (`layouts/admin.php`)
 - [x] `app/Core/Uploader.php` yazıldı (jpg/png/webp, finfo + getimagesize, rastgele ad, 2 MB, 6000 px)
 - [x] `app/Models/ProductImage.php` yazıldı (tek ana görsel kuralı, sıralama, alt metin)
-- [ ] `Admin/ProductImageController.php` ve ürün formunda görsel arayüzü bekliyor
 - [ ] Marka, ürün ve ürün görseli dosyalarında `php -l` ve elle test çalıştırılmadı
 - [x] Varyant modülü başladı (2026-10-31): `Models/ProductVariant.php`, `Admin/ProductVariantController.php`, `admin/products/variants/index.php` yazıldı; 6 varyant route'u `App.php`'de (liste, oluştur, kaydet, düzenle, güncelle, durum)
 - [x] Varyant dosyalarında `php -l` geçti (model, controller, `App.php`, index view); veritabanıyla elle test yapılmadı
-- [ ] `admin/products/variants/form.php` bekliyor (liste ve oluştur/düzenle sayfaları bu view olmadan hata verir)
-- [ ] Ürün formundan ve ürün listesinden varyant sayfasına bağlantı bekliyor
+- [x] `Admin/ProductImageController.php` ve `admin/products/images/index.php` yazıldı; 6 görsel route'u `App.php`'de (2026-10-31)
+- [x] `admin/products/variants/form.php` yazıldı
+- [x] Ürün formu ve ürün listesine "Görseller" ve "Varyantlar" bağlantıları eklendi
+- [x] `App.php` düzeltildi: çift `use` satırları ve çift `sil` route'u kaldırıldı
+- [x] `Auth.php` `app/Core/` altına taşındı; `AuthMiddleware.php` kopyası silindi
+- [x] Stok modülü yazıldı: `Models/StockMovement.php`, `Admin/StockController.php`, `admin/stock/{index,form,history}.php`
+- [ ] Stok route'ları `App.php`'ye ve "Stok" menü satırı `layouts/admin.php`'ye eklenecek
 
 ## 3. Oluşturulan Migration Dosyaları
 
@@ -92,16 +96,19 @@ Toplam: 18 migration dosyası, 31 uygulama tablosu (schema_migrations hariç).
 - `ProductVariant`: fiziksel silme yok (`delete()` kapalı, `setActive()` kullanılır); `getByProduct`, `findForProduct`, `countByProduct`, `isPurchasable`, `currentPrice`, `skuExists` (varyant + ürün), `nameExists`; `create()` ürünün varlığını ve fiyat kurallarını denetler; `update()` `product_id` ve `stock_quantity` yazmayı reddeder
 - `Admin\ProductVariantController`: `index`, `create`, `store`, `edit`, `update`, `toggle` (Fetch için JSON, form için yönlendirme); varyantın URL'deki ürüne ait olduğunu doğrular
 - View: `admin/products/variants/index` (aktif/pasif anahtarı Fetch ile)
+- `ProductImageController`: `index`, `store` (en fazla 10 görsel, hata olursa dosyalar silinir), `setMain`, `updateAlt`, `reorder` (Fetch, JSON), `destroy`
+- `StockMovement`: yalnızca eklenir (`create/update/delete` kapalı); `record()` stok güncelleme ve hareketi aynı transaction'da, `FOR UPDATE` ile yapar; `paginate`, `getStockItems`
+- `Admin\StockController`: `index`, `create`, `store`, `history`
+- View: `admin/products/images/index`, `admin/products/variants/form`, `admin/stock/{index,form,history}`
 
 ## 5. Sıradaki Dosya
 
-1. `app/Controllers/Admin/ProductImageController.php` (yükleme, ana yapma, sıralama, alt metin, silme) + route'lar
-2. Ürün formuna görsel bölümü (düzenleme ekranı; `enctype="multipart/form-data"`)
-3. `admin/products/variants/form.php`, ardından ürün formu ve ürün listesine "Varyantlar" bağlantısı
-4. Stok modülü: `StockMovement` modeli, manuel stok hareketleri (FR-026)
-5. Dashboard: ürün sayısı ve kritik stok kartı (FR-097)
-6. Kategori/marka formlarına görsel/logo alanı (Uploader hazır; DECISIONS karar 22 güncellenecek)
-7. Doğrulama turu: `php -l` (tümü) ve elle test (dashboard, kategori, marka, ürün)
+1. `App.php` stok route'ları + `layouts/admin.php` stok menüsü
+2. `DashboardController` ve dashboard view: ürün sayısı, kritik stok kartı (FR-097, `Product::getLowStock()`)
+3. Ürün oluşturma ve varyant oluşturmada başlangıç stoğu için `stock_movements` kaydı
+4. Kategori/marka formlarına görsel/logo alanı
+5. Doğrulama turu: `php -l` (tümü) ve elle test
+6. Sepet modülü
 
 ## 6. Bekleyen Migration Dosyaları
 
@@ -143,14 +150,16 @@ Bekleyen migration yazımı yok (001–018 yazıldı). Bekleyen iş: 010–018'i
 31. **Varyant stoğu:** `product_variants.stock_quantity` yalnızca varyant oluştururken başlangıç stoğu olarak yazılır; güncellemede yazılmaz (stok modülünden, FR-026). Varyant ürün değiştiremez (`product_id` değişmez).
 32. **Varyant benzersizliği:** aynı üründe aynı varyant adı kullanılamaz; SKU ürünler ve varyantlar arasında benzersizdir (karar 24 ile aynı kural).
 33. **Kritik stok eşiği:** varyantlarda ayrı eşik yok; "Kritik" uyarısı ürünün `critical_stock_quantity` değerini kullanır.
+34. **Ürün görselleri:** ürün başına en fazla 10 görsel. DB kaydı başarısız olursa yüklenen dosyalar silinir. Silmede önce kayıt, sonra dosya kaldırılır. Sıralama Yukarı/Aşağı butonları ve Fetch ile yapılır.
+35. **Stok hareketleri:** `stock_movements` yalnızca eklenir. Stok güncelleme ve hareket kaydı aynı transaction'da, satır `FOR UPDATE` ile kilitlenerek yapılır. Stok negatife düşemez. Manuel harekette işlem nedeni zorunludur (FR-026). `correction` türünde girilen değer hedef stoktur; kaydedilen miktar farkın mutlak değeridir. Formdan yalnızca `incoming`, `outgoing`, `return`, `correction` kabul edilir; `reservation` sistem kaynaklıdır.
+36. **Kalem seçimi:** stok formunda kalem `p{ürün}` veya `p{ürün}v{varyant}` biçimindedir. Varyantlı ürüne varyantsız hareket yazılamaz.
 
 ## 8. Bilinen Riskler
 
 ### Kritik
 
-- **ÖNCELİKLİ:** `app/Models/Auth.php` yanlış klasörde (sınıf `App\Core\Auth`). `app/Core/Auth.php` olarak taşınmazsa `/admin` 500 verir: `mv app/Models/Auth.php app/Core/Auth.php`
+
 - `app/Middleware/AuthMiddleware.php` içinde `AdminMiddleware` sınıfı tanımlı (kopya); silinmeli.
-- app/Models/Auth.php yolu: sınıf App\Core\Auth ama dosya app/Models/ altında görünüyor. Autoloader app/Core/Auth.php arar; taşınmazsa /admin 500 verir.
 - app/Middleware/AuthMiddleware.php içinde AdminMiddleware sınıfı tanımlı; AdminMiddleware.php’nin kopyası. Silinmeli.
 - .env içeriği (DB şifresi dahil) sohbete yüklendi. Şifre değiştirilmeli. .env projeden yüklenen dosyalardan çıkarılmalı.
 - DECISIONS.md kendi içinde çelişiyor: "Sepet Kuralları" bölümü eski kuralı (user_id veya session_id) söylüyor. Bkz. DECISIONS.md 3.1.
@@ -162,7 +171,10 @@ Bekleyen migration yazımı yok (001–018 yazıldı). Bekleyen iş: 010–018'i
 
 ### Orta
 
-- Başlangıç stoğu için `stock_movements` kaydı atılmıyor (`StockMovement` modeli yok). Stok modülünde, ürün oluşturma akışına eklenecek.
+- `StockController::store()` model hata mesajını anahtar kelimeyle `quantity`/`item` alanına eşliyor; mesajlar değişirse eşleme bozulur. İleride özel exception sınıfı kullanılmalı.
+- `admin/stock/index.php` içinde `const STOCK_LIST_LIMIT` view içinde tanımlı; değişkene çevrilmeli.
+- `ProductImage::addImage()` closure + `parent::create()` kalıbı ve `StockMovement::record()` aynı kalıbı kullanıyor; ilk çalıştırmada doğrulanmalı.
+- Başlangıç stoğu için `stock_movements` kaydı atılmıyor (`StockMovement` modeli yok). Stok modülünde, ürün oluşturma akışına eklenecek.StockMovement yazıldı; ürün ve varyant oluşturma akışlarına hareket kaydı eklenmeli
 - FR-021 varyant başına kritik stok eşiği istiyor; migration 007'de bu sütun yok. Karar 33'e göre ürünün eşiği kullanılıyor, migration 019 açılmadı. `Product::getLowStock()` yalnızca varyantsız ürünleri kapsıyor; varyantlı ürünlerin kritik stok listesi stok modülünde ele alınmalı.
 - Varyant oluşturulurken girilen başlangıç stoğu için `stock_movements` kaydı atılmıyor (`StockMovement` modeli yok). Ürün başlangıç stoğuyla aynı sorun; stok modülünde birlikte çözülecek.
 - WebP yüklemesi için sunucuda GD/WebP desteği gerekir; yoksa "geçerli görsel değil" hatası verir.
@@ -198,6 +210,7 @@ Bekleyen migration yazımı yok (001–018 yazıldı). Bekleyen iş: 010–018'i
 - 2026-10-31 (dashboard view, kategori ve marka dosyaları yazıldı; php -l çalıştırılmadı).
 - 2026-10-31 (ürün modülü, Uploader ve ProductImage yazıldı; php -l ve elle test çalıştırılmadı).
 - 2026-10-31 (varyant modeli, controller, route'lar ve liste view'ı yazıldı; yalnızca `php -l` çalıştırıldı, veritabanı ve tarayıcı testi yapılmadı).
+- 2026-10-31 (görsel, varyant formu, Auth taşıma, stok modülü yazıldı; `php -l` ve elle test çalıştırılmadı).
 
 ## Teknik Kararlar
 
@@ -210,12 +223,3 @@ Bekleyen migration yazımı yok (001–018 yazıldı). Bekleyen iş: 010–018'i
 
 Kararların tamamı için bkz. DECISIONS.md.
 
-## Sıradaki Adım
-
-1. `app/Controllers/Admin/ProductImageController.php` (yükleme, ana yapma, sıralama, alt metin, silme) + route'lar
-2. Ürün formuna görsel bölümü (düzenleme ekranı; `enctype="multipart/form-data"`)
-3. `admin/products/variants/form.php`, ardından ürün formu ve ürün listesine "Varyantlar" bağlantısı
-4. Stok modülü: `StockMovement` modeli, manuel stok hareketleri (FR-026)
-5. Dashboard: ürün sayısı ve kritik stok kartı (FR-097)
-6. Kategori/marka formlarına görsel/logo alanı (Uploader hazır; DECISIONS karar 22 güncellenecek)
-7. Doğrulama turu: `php -l` (tümü) ve elle test (dashboard, kategori, marka, ürün)

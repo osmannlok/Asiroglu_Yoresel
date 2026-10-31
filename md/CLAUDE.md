@@ -93,7 +93,9 @@ ashiroglu-market/
 │   │       ├── CouponController.php
 │   │       ├── AuthController.php
 │   │       ├── BrandController.php
-│   │       └── SettingController.php
+│   │       ├── SettingController.php
+│   │       ├── ProductImageController.php
+│   │       └── ProductVariantController.php
 │   ├── Middleware/
 │   │       └── AdminMiddleware.php
 │   ├── Models/
@@ -217,7 +219,7 @@ Planlanan 31 uygulama tablosu:
 
 - `carts` yalnızca giriş yapmış kullanıcılar içindir; `carts.user_id` NOT NULL'dır. `carts.session_id` rezerve alandır, kullanılmaz.
 - Giriş yapınca session sepeti kullanıcının DB sepetiyle transaction içinde birleştirilir (aynı ürün+varyantta adetler toplanır, stok sınırı aşılmaz).
-- Kullanıcı giriş yaptığında misafir sepeti üye sepetiyle birleştirilir.
+- Misafir sepeti yalnızca PHP session'da tutulur; veritabanında carts/cart_items kaydı açılmaz (bkz. DECISIONS.md MİSAFİR SEPETİ).
 - `cart_items.variant_key` VIRTUAL generated column'dur: `IFNULL(product_variant_id, 0)`. UNIQUE index: `uq_cart_item_product (cart_id, product_id, variant_key)`.
 - Sepet işlemleri Fetch API ile AJAX üzerinden yapılacak.
 - Sepete ekleme, adet güncelleme ve ürün silme işlemlerinde stok kontrolü yapılacak.
@@ -343,8 +345,8 @@ Claude aşağıdaki sırayı takip edecektir:
 2. Veritabanı migration dosyaları (001–018 tamamlandı)
 3. Kategori ve marka yönetimi (tamamlandı; görsel/logo alanları Uploader ile sonra eklenecek)
 4. Ürün yönetimi (model, controller, liste ve form view'ları tamamlandı)
-5. Ürün görselleri ve varyantlar (Uploader ve ProductImage modeli tamamlandı; görsel controller'ı ve varyantlar bekliyor)
-6. Stok yönetimi
+5. Ürün görselleri ve varyantlar (tamamlandı)
+6. Stok yönetimi (model, controller, view'lar tamamlandı; route ve menü bekliyor)
 7. Admin paneli
 8. Sepet modülü
 9. Sipariş modülü

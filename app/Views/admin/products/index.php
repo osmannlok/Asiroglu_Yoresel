@@ -185,7 +185,12 @@ $windowEnd   = min($totalPages, $page + 2);
                             <td class="text-end text-nowrap">
                                 <a href="<?= $this->e($this->url($basePath . '/' . $id . '/duzenle')) ?>"
                                    class="btn btn-sm btn-outline-primary">Düzenle</a>
+                                <a href="<?= $this->e($this->url($basePath . '/' . $id . '/gorseller')) ?>"
+                                    class="btn btn-sm btn-outline-secondary">Görseller</a>
 
+                                <a href="<?= $this->e($this->url($basePath . '/' . $id . '/varyantlar')) ?>"
+                                    class="btn btn-sm btn-outline-secondary">Varyantlar</a>
+                                    
                                 <button type="button" class="btn btn-sm btn-outline-danger"
                                         data-confirm-form="<?= $this->e($formId) ?>"
                                         data-confirm-message="<?= $this->e('"' . (string) $row['name'] . '" ürünü silinsin mi?') ?>">
