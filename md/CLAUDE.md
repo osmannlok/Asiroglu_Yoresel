@@ -130,7 +130,7 @@ Dashboard, kategori, marka, ürün, görsel, varyant, stok, sipariş, müşteri,
 6. Stok ✅
 7. Admin dashboard ✅
 8. Sepet + vitrin ürün + müşteri auth ✅ (MySQL elle test bekliyor)
-9. Sipariş
+9. Sipariş / checkout ✅ (MySQL elle test bekliyor)
 10. Ödeme
 11. Kargo + iade
 12. E-posta

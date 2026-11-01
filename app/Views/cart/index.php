@@ -18,6 +18,9 @@
  * csrf-token meta etiketinden okunur ve X-CSRF-TOKEN başlığıyla gönderilir.
  * Sunucu yanıtı (özet) görünümün tek doğruluk kaynağıdır.
  *
+ * "Ödemeye Geç" bağlantısı /odeme'ye gider (FR-060). Satın alınamayan kalem
+ * varsa bağlantı kilitlenir; sunucu da bu durumda checkout'u sepete döndürür.
+ *
  * Fiyatlar bilgilendirme amaçlıdır; sipariş oluşturulurken güncel fiyat ve
  * stokla yeniden kontrol edilir (DECISIONS.md, Misafir Sepeti).
  *
@@ -153,11 +156,11 @@ $isEmpty = $items === [];
                         Sepetinizde satın alınamayan ürün var. Devam etmek için o ürünü çıkarın veya adedini düşürün.
                     </div>
 
-                    <!-- Ödeme modülü yazılınca bağlantıya çevrilecek -->
-                    <button type="button" class="btn btn-success w-100" id="checkoutButton" disabled
-                            title="Ödeme adımı henüz hazır değil">
+                    <a href="<?= $this->e($this->url('/odeme')) ?>"
+                       class="btn btn-success w-100<?= $hasProblem ? ' disabled' : '' ?>"
+                       id="checkoutButton"<?= $hasProblem ? ' aria-disabled="true" tabindex="-1"' : '' ?>>
                         Ödemeye Geç
-                    </button>
+                    </a>
 
                     <a href="<?= $this->e($this->url('/')) ?>"
                        class="btn btn-link w-100 mt-2 text-decoration-none">Alışverişe Devam Et</a>
@@ -324,6 +327,21 @@ $isEmpty = $items === [];
 
             if (problemBox) {
                 problemBox.classList.toggle('d-none', !problem);
+            }
+
+            // Satın alınamayan kalem varsa "Ödemeye Geç" bağlantısı kilitlenir
+            var checkoutLink = document.getElementById('checkoutButton');
+
+            if (checkoutLink) {
+                checkoutLink.classList.toggle('disabled', problem);
+
+                if (problem) {
+                    checkoutLink.setAttribute('aria-disabled', 'true');
+                    checkoutLink.setAttribute('tabindex', '-1');
+                } else {
+                    checkoutLink.removeAttribute('aria-disabled');
+                    checkoutLink.removeAttribute('tabindex');
+                }
             }
 
             var isEmpty = rows().length === 0;

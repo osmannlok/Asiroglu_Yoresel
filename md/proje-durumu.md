@@ -32,12 +32,17 @@
 - [x] layouts/main: menü (Ürünler, Sepet rozetli, arama, Giriş/Kayıt/Çıkış, Yönetim)
 - [x] Müşteri Auth: AuthController, auth/{login,register}, 5 route; giriş/kayıtta mergeGuestCart
 
-**Sipariş (başladı)**
+**Sipariş / Checkout**
 - [x] Order modeli: place, changeStatus, findByNumber, getItems, getHistory, paginateByUser
+- [x] ShippingMethod modeli (delete() kapalı → setActive; calculateFee, remainingForFreeShipping)
+- [x] CheckoutService (quote, validate, placeOrder), CheckoutController, checkout/{index,complete}
+- [x] App.php: /odeme, /odeme/ozet, POST /odeme, /siparis/tamamlandi; sepette "Ödemeye Geç" bağlantısı
 
 **Bekleyen test**
 - [ ] Yeni dosyalarda `php -l` + elle test (layouts/main, AuthController, auth views, App.php, CartService, Order)
 - [ ] Migration 011+ gerçek MySQL’de çalıştırma
+- [ ] `php -l`: ShippingMethod, CheckoutService, CheckoutController, checkout views, App.php, cart/index
+- [ ] Checkout elle test (TEST-COMMANDS.md); en az bir shipping_methods satırı gerekir
 
 ## 3. Migration’lar (001–018)
 
@@ -71,18 +76,19 @@
 | Cart | üye sepeti; resolveSellable (stok/varyant/vitrin) |
 | CartService | misafir (session) + üye; mergeGuestCart |
 | Order | place, changeStatus, sorgular |
+| ShippingMethod | delete() kapalı → setActive(); calculateFee, remainingForFreeShipping |
+| CheckoutService | quote/validate/placeOrder; güncel fiyatla kargo hesabı; başarıdan sonra sepet boşalır |
 
 **Uploader:** products|categories|brands|banners · finfo + getimagesize · rastgele ad
 
 ## 5. Sıradaki
 
-1. `ShippingMethod.php` (gerekli mi → migration 014’e bak)
-2. `CheckoutService.php`
-3. `CheckoutController.php` + views
-4. App.php sipariş rotaları
-5. Hesabım sipariş sayfaları
-6. Coupon modeli + sipariş bağlama
-7. Ödeme → Kargo → İade
+1. Admin kargo yöntemleri CRUD (FR-085; şimdilik SQL ile eklenir)
+2. Hesabım sipariş sayfaları (liste, detay; findForUser)
+3. Coupon modeli + checkout/sipariş bağlama
+4. Payment modeli + PaymentGatewayInterface, kart/havale akışı
+5. Admin sipariş yönetimi, kargo takip no (shipments)
+6. İade → E-posta → Raporlama
 
 ## 6. Kritik Kararlar (özet)
 
@@ -97,6 +103,8 @@
 - Sepet: max 50 kalem, kalem başına max 1000 adet; fiyat bilgilendirme, siparişte yeniden hesap
 - `next` parametresi: sadece güvenli site-içi yol
 - Admin/vitrin oturumu ortak (`_auth_user_id`); müşteri `/admin/giris` yapamaz
+- Checkout: kargo eşiği kupon sonrası tutara göre (kupon yokken subtotal); sonuç sayfası `_last_order` oturumuyla açılır, numara URL'de yok
+- Başlangıç durumu: kapıda ödeme `pending`; kart/havale `awaiting_payment`
 
 Tam liste → `DECISIONS.md`
 
@@ -117,6 +125,10 @@ Tam liste → `DECISIONS.md`
 - E-posta doğrulama (FR-051) ve şifremi unuttum (FR-052) yok
 - `layouts/main.php` doğrudan `$_GET`/`$_SERVER` okuyor
 - Vitrin “Hesabım” (profil/adres/sipariş) henüz yok
+- Ödeme yöntemi orders'ta saklanmıyor; payments modeli gelene kadar yalnızca oturumda/dönüşte
+- Sipariş sonrası sepet `converted` yapılmıyor, kalemler silinir (Cart::markConverted yok)
+- Onay e-postası metni var ama e-posta altyapısı yok (FR-065)
+- Fatura adresi ayrı alınmıyor
 
 **Düşük**
 - CSP / güvenlik başlıkları, Bootstrap SRI, 405 JSON yok
@@ -124,4 +136,4 @@ Tam liste → `DECISIONS.md`
 
 ## 8. Son Güncelleme
 
-2026-11-01 — vitrin menü, müşteri Auth, sepet, Order modeli. `php -l` + elle test bekliyor.
+2026-11-01 — vitrin menü, müşteri Auth, sepet, Order modeli. → 2026-11-01 — checkout (model, servis, controller, view, rotalar). php -l + elle test bekliyor.

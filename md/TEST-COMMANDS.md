@@ -73,6 +73,11 @@ php -l app/Controllers/AuthController.php
 php -l app/Views/auth/login.php
 php -l app/Views/auth/register.php
 php -l app/Models/Order.php
+php -l app/Models/ShippingMethod.php
+php -l app/Services/CheckoutService.php
+php -l app/Controllers/CheckoutController.php
+php -l app/Views/checkout/index.php
+php -l app/Views/checkout/complete.php
 
 ### Tüm PHP dosyalarını tek seferde tara
 
@@ -224,3 +229,19 @@ Elle test (migration 012 uygulandıktan sonra):
 - `delivered → paid` gibi geçersiz geçiş `InvalidArgumentException` vermeli.
 - `Order::create()`, `update()` ve `delete()` `BadMethodCallException` vermeli.
 - `findForUser()` başka kullanıcının sipariş ID'siyle `null` dönmeli.
+
+## Elle Test: Checkout (migration 012 + 014 uygulandı; en az bir aktif kargo yöntemi gerekir)
+
+Örnek kargo: INSERT INTO shipping_methods (name, code, price, free_shipping_limit, sort_order) VALUES ('Standart Kargo','standard',89.00,750.00,1);
+
+1. Boş sepetle `/odeme` → `/sepet`'e yönlenmeli. Satın alınamayan kalemle de `/sepet`'e dönmeli.
+2. CSRF'siz `POST /odeme` → 419. `GET /odeme/ozet?kargo=abc` → 422 JSON.
+3. Kargo değişince toplamlar sayfa yenilenmeden güncellenmeli; eşik altında "X ₺ daha ekleyin", eşik ve üstünde "Ücretsiz".
+4. Eksik alanla gönderim: alan hataları görünmeli, değerler korunmalı. Telefon `12345` reddedilmeli.
+5. Kapıda ödeme → sipariş `pending`; kart/havale → `awaiting_payment`.
+6. Misafir siparişi: `orders.user_id` NULL, `customer_email` dolu. Üyede ad/e-posta/telefon ön dolu gelmeli.
+7. Başarılı sipariş: sepet boşalmalı, stok düşmeli (`stock_movements` outgoing, reference=order), `/siparis/tamamlandi` açılmalı.
+8. Stoğu yetmeyen kalem: sipariş reddedilmeli, `orders`/`order_items` kaydı kalmamalı, sepet korunmalı.
+9. Başka oturum/üye ile `/siparis/tamamlandi` → ana sayfa (G-05). Adreste `<script>` kaçırılmalı (G-02).
+10. Sepette "Ödemeye Geç" `/odeme`'ye gitmeli; stoksuz kalemde kilitli, kalem çıkarılınca aktifleşmeli.
+11. ShippingMethod: `calculateFee` eşik altında price, eşikte 0; `remainingForFreeShipping` eşikte null; `delete()` BadMethodCallException; negatif ücret/bozuk `code` reddedilmeli.

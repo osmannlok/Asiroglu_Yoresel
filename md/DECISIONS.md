@@ -52,6 +52,15 @@
 - Geçmiş: `order_status_history`
 - `payments.order_id` / `shipments.order_id`: UNIQUE değil (çoklu deneme / parçalı gönderim)
 
+### Checkout
+
+- Servis: `CheckoutService`; controller ince. Misafir + üye (FR-062). Fatura adresi ayrı yok (null = teslimatla aynı)
+- Tutarlar güncel fiyatla yeniden hesaplanır; kargo = `ShippingMethod::calculateFee(yöntem, kupon sonrası tutar)`; eşik: tutar ≥ `free_shipping_limit` → ücretsiz
+- Başlangıç durumu: `cash_on_delivery` → `pending`; `credit_card`, `bank_transfer` → `awaiting_payment`
+- Sonuç sayfası: oturumda `_last_order`; numara URL'de taşınmaz; sahiplik `user_id` ile kontrol (G-05)
+- Sipariş sonrası sepet kalemleri silinir (`converted` ileride); hata siparişi bozmaz
+- `ShippingMethod`: deleted_at yok; `delete()` kapalı → `setActive()`
+
 ### Order modeli
 
 - Yazma: yalnızca `place()` ve `changeStatus()`; `create/update/delete` kapalı
@@ -131,6 +140,7 @@
 - Güvenlik başlıkları, SRI, 405 JSON → ayrı görev
 - Müşteri rate limiting yok
 - Layout `$_GET['q']` / `REQUEST_URI` doğrudan okur → ileride controller’dan geçirilecek
+- Ödeme yöntemi kalıcılığı payments modelinde; admin kargo CRUD yok; `Cart::markConverted()` yok
 
 ## Diğer
 

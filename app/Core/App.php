@@ -21,6 +21,7 @@ use App\Controllers\Admin\ProductVariantController;
 use App\Controllers\Admin\StockController;
 use App\Controllers\AuthController as StorefrontAuthController;
 use App\Controllers\CartController;
+use App\Controllers\CheckoutController;
 use App\Controllers\HomeController;
 use App\Controllers\ProductController as StorefrontProductController;
 use App\Middleware\AdminMiddleware;
@@ -117,6 +118,16 @@ final class App
         $this->router->post('/sepet/ekle', [CartController::class, 'add']);
         $this->router->post('/sepet/guncelle', [CartController::class, 'update']);
         $this->router->post('/sepet/sil', [CartController::class, 'remove']);
+
+
+        // --- Checkout (FR-043, FR-045, FR-046, FR-060..FR-064, FR-074) ------
+        // Misafir de sipariş verebilir (FR-062); bu route'lar AdminMiddleware
+        // dışındadır. POST /odeme için CSRF doğrulaması handle() içinde yapılır.
+        // Sonuç sayfası numarayı URL'de taşımaz; oturumdaki _last_order ile açılır.
+        $this->router->get('/odeme', [CheckoutController::class, 'index']);
+        $this->router->get('/odeme/ozet', [CheckoutController::class, 'summary']);
+        $this->router->post('/odeme', [CheckoutController::class, 'store']);
+        $this->router->get('/siparis/tamamlandi', [CheckoutController::class, 'complete']);
 
         // --- Yönetim paneli: giriş ve çıkış ---------------------------------
         // Bu route'lar AdminMiddleware grubunun DIŞINDA kalmalıdır; aksi halde
