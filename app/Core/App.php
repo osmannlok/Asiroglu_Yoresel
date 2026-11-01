@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace App\Core;
 
+use App\Controllers\AccountOrderController; // YENİ
 use App\Controllers\Admin\AuthController as AdminAuthController;
 use App\Controllers\Admin\BrandController;
 use App\Controllers\Admin\CategoryController;
@@ -110,6 +111,13 @@ final class App
         $this->router->get('/kayit', [StorefrontAuthController::class, 'showRegister']);
         $this->router->post('/kayit', [StorefrontAuthController::class, 'register']);
         $this->router->post('/cikis', [StorefrontAuthController::class, 'logout']);
+
+        // --- Hesabım: siparişler (FR-055, FR-069, G-05) --------------------- // YENİ
+        // Müşteri hesabıdır; AdminMiddleware dışındadır. Giriş denetimi ve       // YENİ
+        // sipariş sahipliği (Order::findForUser) controller'da yapılır.          // YENİ
+        // Yalnızca GET olduğu için CSRF gerekmez.                                // YENİ
+        $this->router->get('/hesabim/siparisler', [AccountOrderController::class, 'index']); // YENİ
+        $this->router->get('/hesabim/siparisler/{id:\d+}', [AccountOrderController::class, 'show']); // YENİ
 
         // --- Sepet (FR-040, FR-042, FR-043, FR-044, FR-045) -----------------
         // Misafir de sepet kullanır; bu route'lar AdminMiddleware dışındadır.

@@ -38,13 +38,23 @@
 - [x] CheckoutService (quote, validate, placeOrder), CheckoutController, checkout/{index,complete}
 - [x] App.php: /odeme, /odeme/ozet, POST /odeme, /siparis/tamamlandi; sepette "Ödemeye Geç" bağlantısı
 
+<!-- YENİ -->
+**Hesabım: siparişler (FR-055, FR-069 kısmen, G-05)**
+- [x] `AccountOrderController` (index, show): giriş zorunlu, misafir `/giris?next=...` adresine yönlenir; sipariş `Order::findForUser()` ile sahibine bağlı
+- [x] `account/orders/{index,show}` view'ları: liste (sayfalı, durum/ödeme rozeti), detay (kalemler, toplamlar, adres, durum geçmişi; personel adı gösterilmez)
+- [x] `App.php`: `GET /hesabim/siparisler`, `GET /hesabim/siparisler/{id:\d+}` (AdminMiddleware dışı)
+- [x] `layouts/main.php`: üye menüsünde "Siparişlerim" bağlantısı (aktif işaretli)
+
 **Bekleyen test**
 - [ ] Yeni dosyalarda `php -l` + elle test (layouts/main, AuthController, auth views, App.php, CartService, Order)
 - [ ] Migration 011+ gerçek MySQL’de çalıştırma
 - [ ] `php -l`: ShippingMethod, CheckoutService, CheckoutController, checkout views, App.php, cart/index
 - [ ] Checkout elle test (TEST-COMMANDS.md); en az bir shipping_methods satırı gerekir
+<!-- YENİ -->
+- [ ] `php -l`: AccountOrderController, account/orders/index, account/orders/show, App.php, layouts/main
+- [ ] Hesabım siparişleri elle test: girişsiz yönlendirme + `next` dönüşü, kendi siparişi, başka kullanıcının ID'si ("Sipariş bulunamadı."), misafir siparişi üye listesinde görünmemeli, menüde aktif işaret
 
-- [~] Admin kargo yöntemi CRUD (FR-084, FR-085): `ShippingMethodController`, `admin/shipping/index.php`, `admin/shipping/form.php` yazıldı. Route ve menü bağlanmadı, test edilmedi.
+- [~] Admin kargo yöntemi CRUD (FR-084, FR-085): `ShippingMethodController`, `admin/shipping/index.php`, `admin/shipping/form.php` yazıldı. Route ve menü bağlandı (`App.php`, `layouts/admin.php`); test edilmedi.
 
 ## 3. Migration’lar (001–018)
 
@@ -77,7 +87,7 @@
 | StockMovement | sadece record(); FOR UPDATE + transaction |
 | Cart | üye sepeti; resolveSellable (stok/varyant/vitrin) |
 | CartService | misafir (session) + üye; mergeGuestCart |
-| Order | place, changeStatus, sorgular |
+| Order | place, changeStatus, sorgular (findForUser, paginateByUser Hesabım'da kullanılıyor) |
 | ShippingMethod | delete() kapalı → setActive(); calculateFee, remainingForFreeShipping |
 | CheckoutService | quote/validate/placeOrder; güncel fiyatla kargo hesabı; başarıdan sonra sepet boşalır |
 
@@ -85,10 +95,10 @@
 
 ## 5. Sıradaki
 
-1. Hesabım sipariş sayfaları (liste, detay; findForUser)
-2. Coupon modeli + checkout/sipariş bağlama
-3. Payment modeli + PaymentGatewayInterface, kart/havale akışı
-4. Admin sipariş yönetimi, kargo takip no (shipments)
+1. Coupon modeli + checkout/sipariş bağlama
+2. Payment modeli + PaymentGatewayInterface, kart/havale akışı
+3. Admin sipariş yönetimi, kargo takip no (shipments); tamamlanınca `account/orders/show.php`'ye kargo bloğu (FR-069)
+4. Hesabım profil/adres sayfaları (FR-053, FR-054)
 5. İade → E-posta → Raporlama
 
 ## 6. Kritik Kararlar (özet)
@@ -109,6 +119,8 @@
 - Kargo yöntemi silinmez, yalnızca aktif/pasif yapılır. `code` oluşturulduktan sonra değişmez. Son aktif yöntem kapatılamaz.
 - `shipping/index.php` ve `form.php` içinde `$this->csrfField()` kullanıldı. `variants/index.php` ile aynı yöntem olup olmadığı kontrol edilecek.
 - `index.php` Bootstrap Icons (`bi`) sınıfı kullanıyor. Layout'ta yüklü olup olmadığı kontrol edilecek.
+<!-- YENİ -->
+- Hesabım siparişleri: yalnızca üye; sahiplik `Order::findForUser()` ile. Başkasının sipariş ID'si ile olmayan ID aynı yanıtı verir (G-05). Müşteriye durum geçmişinde yalnızca durum, not ve tarih gösterilir (personel adı view'a taşınmaz). Misafir siparişi (`user_id` NULL) üye listesinde görünmez.
 
 Tam liste → `DECISIONS.md`
 
@@ -128,7 +140,10 @@ Tam liste → `DECISIONS.md`
 - FR-021 varyant kritik stok eşiği yok; ürün eşiği kullanılıyor
 - E-posta doğrulama (FR-051) ve şifremi unuttum (FR-052) yok
 - `layouts/main.php` doğrudan `$_GET`/`$_SERVER` okuyor
-- Vitrin “Hesabım” (profil/adres/sipariş) henüz yok
+<!-- YENİ -->
+- Hesabım'da profil ve adres sayfaları henüz yok (yalnızca "Siparişlerim" var)
+- Kargo takip bilgisi (FR-069) sipariş detayında gösterilmiyor; shipments modeli gelince eklenecek
+- Misafir sipariş takibi (numara + e-posta, `findByNumberAndEmail`) için sayfa yok
 - Ödeme yöntemi orders'ta saklanmıyor; payments modeli gelene kadar yalnızca oturumda/dönüşte
 - Sipariş sonrası sepet `converted` yapılmıyor, kalemler silinir (Cart::markConverted yok)
 - Onay e-postası metni var ama e-posta altyapısı yok (FR-065)
@@ -140,4 +155,4 @@ Tam liste → `DECISIONS.md`
 
 ## 8. Son Güncelleme
 
-2026-11-01 — vitrin menü, müşteri Auth, sepet, Order modeli. → 2026-11-01 — checkout (model, servis, controller, view, rotalar). php -l + elle test bekliyor.
+2026-11-01 — vitrin menü, müşteri Auth, sepet, Order modeli; checkout (model, servis, controller, view, rotalar); Hesabım sipariş sayfaları (controller, 2 view, 2 route, menü bağlantısı). php -l + elle test bekliyor.

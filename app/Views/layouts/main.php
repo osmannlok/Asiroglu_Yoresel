@@ -8,10 +8,11 @@
  * Menüde Ana Sayfa, Ürünler ve Sepet bağlantıları bulunur. Sepet rozeti ilk
  * açılışta sunucuda hesaplanır; sonrasında /sepet/ altına yapılan başarılı
  * POST yanıtlarındaki "count" değeriyle sayfa yenilenmeden güncellenir.
+ * Giriş yapmış üyede "Siparişlerim" bağlantısı gösterilir (FR-055).
  *
  * Kullanılabilir yardımcılar: $this->e(), $this->url()
  *
- * Gereksinimler: FR-001, FR-003, FR-043, FR-045, NFR-005.
+ * Gereksinimler: FR-001, FR-003, FR-043, FR-045, FR-055, NFR-005.
  */
 use App\Core\App;
 use App\Core\Auth;
@@ -68,6 +69,7 @@ $currentPath = '/' . ltrim((string) explode('?', (string) ($_SERVER['REQUEST_URI
 $isHome     = $currentPath === '/';
 $isProducts = $currentPath === '/urunler' || str_starts_with($currentPath, '/urun/');
 $isCart     = $currentPath === '/sepet';
+$isOrders   = $currentPath === '/hesabim/siparisler' || str_starts_with($currentPath, '/hesabim/siparisler/'); // YENİ
 
 // Arama kutusunda mevcut aramayı göster (yalnızca metin ise)
 $searchValue = isset($_GET['q']) && is_string($_GET['q']) ? mb_substr(trim($_GET['q']), 0, 100) : '';
@@ -125,7 +127,6 @@ $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_
                            <?= $isProducts ? 'aria-current="page"' : '' ?>
                            href="<?= $this->e($this->url('/urunler')) ?>">Ürünler</a>
                     </li>
-                    <!-- Hesabım bağlantısı müşteri kayıt/giriş modülünde eklenecek -->
                 </ul>
 
                 <form class="d-flex me-lg-3 mb-2 mb-lg-0" method="get" role="search"
@@ -136,7 +137,7 @@ $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_
                     <button type="submit" class="btn btn-light btn-sm">Ara</button>
                 </form>
 
-                <!-- Kullanıcı alanı: misafir için Giriş/Kayıt, üye için ad ve Çıkış -->
+                <!-- Kullanıcı alanı: misafir için Giriş/Kayıt, üye için Siparişlerim, ad ve Çıkış -->
                 <ul class="navbar-nav align-items-lg-center me-lg-3 mb-2 mb-lg-0">
                     <?php if ($isLoggedIn): ?>
                         <?php if ($authIsStaff): ?>
@@ -144,6 +145,12 @@ $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_
                                 <a class="nav-link" href="<?= $this->e($this->url('/admin')) ?>">Yönetim Paneli</a>
                             </li>
                         <?php endif; ?>
+                        <!-- YENİ: Siparişlerim (FR-055) -->
+                        <li class="nav-item">
+                            <a class="nav-link<?= $isOrders ? ' active' : '' ?>"
+                               <?= $isOrders ? 'aria-current="page"' : '' ?>
+                               href="<?= $this->e($this->url('/hesabim/siparisler')) ?>">Siparişlerim</a>
+                        </li>
                         <li class="nav-item">
                             <span class="navbar-text text-white me-lg-2"><?= $this->e($authUserName) ?></span>
                         </li>
