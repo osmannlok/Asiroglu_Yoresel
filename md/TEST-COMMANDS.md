@@ -72,7 +72,7 @@ php -l app/Views/products/show.php
 php -l app/Controllers/AuthController.php
 php -l app/Views/auth/login.php
 php -l app/Views/auth/register.php
-
+php -l app/Models/Order.php
 
 ### Tüm PHP dosyalarını tek seferde tara
 
@@ -216,3 +216,11 @@ git rm --cached <dosya>
 7. Çıkış: menüdeki "Çıkış" butonu POST yapmalı, "Çıkış yaptınız." mesajı görünmeli. CSRF'siz `POST /cikis` → 419. `GET /cikis` → 405.
 8. Yetki: müşteri hesabıyla `/admin/giris` → "E-posta veya şifre hatalı."; müşteri oturumuyla `/admin` → 403. Admin/staff girişinden sonra menüde "Yönetim Paneli" görünmeli, müşteride görünmemeli.
 9. `POST /giris` ve `POST /kayit` CSRF'siz → 419.
+
+Elle test (migration 012 uygulandıktan sonra):
+- Stok 5 olan ürüne 6 adetlik sipariş reddedilmeli; `orders` ve `order_items` içinde kayıt kalmamalı.
+- Başarılı siparişte `stock_movements` içinde `outgoing` kaydı (`reference_type = order`) ve `order_status_history` içinde `NULL → pending` kaydı oluşmalı.
+- `pending → cancelled` stoğu geri eklemeli (`reference_type = order_cancel`).
+- `delivered → paid` gibi geçersiz geçiş `InvalidArgumentException` vermeli.
+- `Order::create()`, `update()` ve `delete()` `BadMethodCallException` vermeli.
+- `findForUser()` başka kullanıcının sipariş ID'siyle `null` dönmeli.

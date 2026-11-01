@@ -1,419 +1,151 @@
-# Aşıroğlu Yöresel Market — PHP MVC E-Ticaret Projesi
+# Aşıroğlu Yöresel Market — PHP MVC E-Ticaret
 
 ## Belge Önceliği
 
-Çelişki durumunda öncelik sırası şöyledir:
-
-1. `DECISIONS.md` (mimari kararların tek kaynağı)
+1. `DECISIONS.md` (mimari kararlar — tek kaynak)
 2. `CLAUDE.md` (bu dosya)
-3. `DATABASE-DEPENDENCIES.md` (migration sırası ve FK haritası)
-4. Diğer belgeler (`GEREKSİNİMLER.MD`, `00-PROJE-TALİMATI.MD`, `02`, `03`, `04`, `proje-kontrol-listesi.md`, `ashiroglu-market-php-mvc-eticaret-raporu.md`) yalnızca referanstır. Bu belgelerle `DECISIONS.md` çelişirse `DECISIONS.md` geçerlidir.
+3. `DATABASE-DEPENDENCIES.md` (migration sırası / FK)
+4. Diğer belgeler yalnızca referans; çelişirse `DECISIONS.md` geçerli
 
-## Proje Amacı
+## Proje
 
-Türkiye genelinde yöresel gıda ve yerel ürün satışı yapan bir e-ticaret sitesi geliştiriyoruz.
+- **Amaç:** Türkiye geneli yöresel gıda e-ticaret sitesi
+- **Kapsam dışı:** Blog, çok satıcılı marketplace
+- **Stack:** PHP 8.2+, Custom MVC (Laravel/Symfony yok), MySQL 8/MariaDB, PDO, Bootstrap 5, Vanilla JS, Fetch (jQuery yok)
+- **Standart:** PSR-12, Türkçe yorum, ince controller, Model/Service’de iş mantığı, layout sistemi
 
-Proje adı: **Aşıroğlu Yöresel Market**
-
-Proje; ürün kataloğu, sepet, sipariş, ödeme, kargo, stok, kampanya, müşteri yönetimi ve admin panelini içerecektir.
-
-## Kapsam
-
-- Blog modülü şu aşamada kapsam dışıdır.
-- Tek satıcılı yapı kurulur; çok satıcılı marketplace mimarisi kurulmaz.
-
-## Teknoloji Kuralları
-
-- PHP 8.2 veya üzeri kullanılacak.
-- Custom MVC mimarisi kullanılacak.
-- Laravel, Symfony, CodeIgniter veya hazır e-ticaret paketi kullanılmayacak.
-- MySQL 8 veya MariaDB kullanılacak.
-- Tüm veritabanı işlemleri PDO ve prepared statement ile yapılacak.
-- Frontend Bootstrap 5, HTML5, CSS3 ve Vanilla JavaScript ile yazılacak.
-- Dinamik işlemler için Fetch API kullanılacak.
-- jQuery kullanılmayacak.
-- Kod PSR-12 uyumlu, Türkçe yorumlu, okunabilir ve modüler olacaktır.
-- Controller dosyaları ince tutulacak; iş mantığı Model veya Service katmanında yer alacaktır.
-- View dosyalarında tekrar eden yapılar için layout sistemi kullanılacaktır.
-
-## Proje Hedefleri
-
-- Mobil uyumlu, hızlı ve güvenli bir e-ticaret sitesi oluşturmak.
-- Yöresel ürünlerde gramaj, raf ömrü, menşe, saklama koşulu ve alerjen bilgilerini yönetmek.
-- Gerçek zamanlı stok takibi yapmak.
-- Admin panelinden ürün, kategori, sipariş, müşteri, kupon ve rapor yönetimi sağlamak.
-- Sepet, sipariş, ödeme ve kargo süreçlerini entegre etmek.
-- SEO uyumlu URL yapısı ve meta yönetimi sunmak.
-
-## Klasör Yapısı
-
-```text
-ashiroglu-market/
-├── public/
-│   ├── index.php
-│   ├── .htaccess
-│   ├── assets/
-│   │   ├── css/
-│   │   ├── js/
-│   │   └── images/
-│   └── uploads/
-│       ├── products/
-│       ├── categories/
-│       └── banners/
+## Klasör Yapısı (özet)
+asiroglu-yoresel/
+├── public/          index.php, .htaccess, assets/, uploads/
 ├── app/
-│   ├── Services/
-│   │   └── CartService.php
-│   ├── Core/
-│   │   ├── App.php
-│   │   ├── Router.php
-│   │   ├── Controller.php
-│   │   ├── Model.php
-│   │   ├── Database.php
-│   │   ├── Request.php
-│   │   ├── Response.php
-│   │   ├── Auth.php
-│   │   ├── Session.php
-│   │   ├── Csrf.php
-│   │   ├── Validator.php
-│   │   ├── Uploader.php
-│   │   └── Logger.php
-│   ├── Controllers/
-│   │   ├── HomeController.php
-│   │   ├── ProductController.php
-│   │   ├── CartController.php
-│   │   ├── CheckoutController.php
-│   │   ├── OrderController.php
-│   │   ├── AuthController.php
-│   │   ├── AccountController.php
-│   │   └── Admin/
-│   │       ├── DashboardController.php
-│   │       ├── ProductController.php
-│   │       ├── CategoryController.php
-│   │       ├── StockController.php
-│   │       ├── OrderController.php
-│   │       ├── CustomerController.php
-│   │       ├── CouponController.php
-│   │       ├── AuthController.php
-│   │       ├── BrandController.php
-│   │       ├── SettingController.php
-│   │       ├── ProductImageController.php
-│   │       └── ProductVariantController.php
-│   ├── Middleware/
-│   │       └── AdminMiddleware.php
-│   ├── Models/
-│   │   ├── User.php
-│   │   ├── Address.php
-│   │   ├── Category.php
-│   │   ├── Brand.php
-│   │   ├── Product.php
-│   │   ├── ProductImage.php
-│   │   ├── ProductVariant.php
-│   │   ├── StockMovement.php
-│   │   ├── Cart.php
-│   │   ├── Order.php
-│   │   ├── OrderItem.php
-│   │   ├── Payment.php
-│   │   ├── Shipment.php
-│   │   ├── Coupon.php
-│   │   └── Setting.php
-│   ├── Views/
-│   │   ├── layouts/
-│   │   ├── home/
-│   │   ├── products/
-│   │   ├── auth/
-│   │   ├── cart/
-│   │   ├── checkout/
-│   │   ├── account/
-│   │   ├── errors/
-│   │   └── admin/
+│   ├── Core/        App, Router, Controller, Model, Database, Request, Response,
+│   │                Auth, Session, Csrf, Validator, Uploader, Logger
+│   ├── Controllers/ Home, Product, Cart, Checkout, Order, Auth, Account + Admin/*
+│   ├── Middleware/  AdminMiddleware
+│   ├── Models/      User, Address, Category, Brand, Product, ProductImage,
+│   │                ProductVariant, StockMovement, Cart, Order, Payment, …
+│   ├── Services/    CartService, …
+│   ├── Views/       layouts, home, products, auth, cart, checkout, account, admin, errors
 │   └── Helpers/
-├── config/
-│   ├── config.php
-│   ├── database.php
-│   ├── payment.php
-│   └── mail.php
-├── database/
-│   ├── migrate.php
-│   ├── migrations/
-│   └── seeds/
-├── storage/
-│   ├── logs/
-│   ├── sessions/
-│   └── cache/
+├── config/          config, database, payment, mail
+├── database/        migrate.php, migrations/, seeds/
+├── storage/         logs/, sessions/, cache/
 └── tests/
-```
-
-## Veritabanı Kuralları
-
-- Gerçek ve güncel şema kaynağı `database/migrations` klasörüdür. `database-schema.sql` yalnızca başlangıç referansıdır ve doğrudan çalıştırılmaz.
-- Migration sırası `DATABASE-DEPENDENCIES.md` dosyasına göre belirlenir.
-- Bir migration çalıştıysa dosyası değiştirilmez. Yeni kolon için yeni migration yazılır.
-- Tüm tablolar InnoDB motoru ile oluşturulacak.
-- Karakter seti `utf8mb4`, collation `utf8mb4_unicode_ci` olacak.
-- Primary key alanları `id` olarak tanımlanacak.
-- Foreign key ilişkileri kullanılacak.
-- Para birimi alanları `DECIMAL(12,2)` olacak.
-- Tarih alanları `DATETIME` olacak.
-- Silme işlemlerinde gerektiğinde soft delete kullanılacak.
-- Migration dosyaları `database/migrations` klasöründe tutulacak.
-- Örnek veriler `database/seeds` klasöründe tutulacak.
-- `schema_migrations` tablosu uygulama tablolarına dahil değildir; `database/migrate.php` tarafından oluşturulur.
-
-## Temel Tablolar
-
-Planlanan 31 uygulama tablosu:
-
-- Kullanıcı: `users`, `addresses`
-- Katalog: `categories`, `brands`, `products`, `product_images`, `product_variants`, `attributes`, `attribute_values`, `product_attributes`
-- Stok: `stock_movements`
-- Kampanya: `coupons`, `coupon_usages`
-- Sepet: `carts`, `cart_items`
-- Sipariş: `orders`, `order_items`, `order_status_history`
-- Ödeme: `payments`, `payment_logs`
-- Kargo ve iade: `shipping_methods`, `shipments`, `return_requests`
-- Etkileşim: `reviews`, `wishlists`
-- İçerik: `banners`, `pages`, `newsletter_subscribers`, `contact_messages`
-- Sistem: `settings`, `activity_logs`
-
-`stocks` ve `logs` adlı tablolar yoktur.
-
-## Ürün Yönetimi Kuralları
-
-Ürün tablosunda aşağıdaki bilgiler bulunmalıdır:
-
-- Ürün adı
-- SEO uyumlu slug
-- SKU
-- Barkod
-- Kısa açıklama
-- Detaylı açıklama
-- Fiyat
-- İndirimli fiyat
-- KDV oranı
-- Stok miktarı
-- Birim türü: adet, kg, gram, paket, litre
-- Ağırlık
-- Menşe
-- Saklama koşulları
-- Raf ömrü
-- Alerjen bilgileri
-- SEO başlığı
-- SEO açıklaması
-- Aktiflik durumu
-- Öne çıkan ürün durumu
-
-Ürünler;
-
-- Birden fazla görsel içerebilmelidir.
-- Kategori ve alt kategori yapısını desteklemelidir.
-- Marka ile ilişkilendirilebilmelidir.
-- Varyant desteklemelidir.
-- Stok takibi yapılabilmelidir.
-
-## Stok Kuralları
-
-- Stok hareketleri `stock_movements` tablosunda tutulur.
-- Varyantsız üründe stok `products.stock_quantity` üzerinden yönetilir.
-- Varyantlı üründe stok `product_variants.stock_quantity` üzerinden yönetilir.
-- Sipariş oluşturma ve stok düşürme aynı transaction içinde yapılır.
-
-## Sepet ve Sipariş Kuralları
 
 
-- `carts` yalnızca giriş yapmış kullanıcılar içindir; `carts.user_id` NOT NULL'dır. `carts.session_id` rezerve alandır, kullanılmaz.
-- Giriş yapınca session sepeti kullanıcının DB sepetiyle transaction içinde birleştirilir (aynı ürün+varyantta adetler toplanır, stok sınırı aşılmaz).
-Misafir sepeti yalnızca PHP session'da tutulur (`$_SESSION['cart']['items']`).
-`carts` ve `cart_items` tabloları yalnızca üye sepeti içindir; `carts.user_id` NOT NULL'dır.
-Giriş yapıldığında misafir sepeti `CartService::mergeGuestCart()` ile üye sepetine birleştirilir.
-- `cart_items.variant_key` VIRTUAL generated column'dur: `IFNULL(product_variant_id, 0)`. UNIQUE index: `uq_cart_item_product (cart_id, product_id, variant_key)`.
-- Sepet işlemleri Fetch API ile AJAX üzerinden yapılacak.
-- Sepete ekleme, adet güncelleme ve ürün silme işlemlerinde stok kontrolü yapılacak.
-- Stokta olmayan veya yetersiz stoklu ürün sepete eklenemeyecek.
-- Sipariş oluşturma işlemi database transaction içinde yapılacak.
-- Sipariş oluştuğunda stok düşürülecek ve sepet temizlenecek.
-- Sipariş numarası formatı: `ASY-YYYYMMDD-NNNNNN`. Her sipariş için benzersiz üretilir.
-- Sipariş durumları İngilizcedir: `pending`, `awaiting_payment`, `paid`, `preparing`, `shipped`, `delivered`, `cancelled`, `payment_failed`, `returned`.
-- Ödeme durumları (`orders.payment_status`) İngilizcedir: `unpaid`, `paid`, `failed`, `refunded`, `partially_refunded`.
-- `orders.customer_email` zorunlu, `orders.customer_phone` isteğe bağlıdır. Misafir siparişleri bu alanlarla takip edilir.
-- Sipariş durumu değişiklikleri `order_status_history` tablosuna kaydedilecek.
-- `payments.order_id` ve `shipments.order_id` UNIQUE değildir (birden fazla ödeme denemesi ve parçalı gönderim olabilir).
 
-## Kupon Kuralları
+## Veritabanı
 
-- Kuponlar fiziksel silinmez. Admin panelinde yalnızca `is_active = 0` veya `deleted_at` doldurma kullanılır.
-- Kupon sorgularında `deleted_at IS NULL` koşulu zorunludur.
-- Limit kontrolünde `COUNT(*)` yerine `coupons.used_count` kullanılır.
-- Kupon kullanımı yalnızca transaction içinde yönetilir: `coupon_usages` kaydı eklenirken `used_count` artırılır, sipariş iptalinde kayıt silinirken azaltılır.
+- Kaynak: `database/migrations` (001–018). `database-schema.sql` sadece referans, çalıştırılmaz.
+- Sıra: `DATABASE-DEPENDENCIES.md`. Çalışmış migration değiştirilmez → yeni migration.
+- InnoDB, utf8mb4_unicode_ci, PK=`id`, FK kullanılır, para=`DECIMAL(12,2)`, soft delete gerektiğinde.
+- `schema_migrations` uygulama tablosu değil; migrate.php oluşturur.
+- **31 tablo:** users, addresses · categories, brands, products, product_images, product_variants, attributes, attribute_values, product_attributes · stock_movements · coupons, coupon_usages · carts, cart_items · orders, order_items, order_status_history · payments, payment_logs · shipping_methods, shipments, return_requests · reviews, wishlists · banners, pages, newsletter_subscribers, contact_messages · settings, activity_logs
+- `stocks` / `logs` tablosu yok.
 
-## Ödeme Kuralları
+## Ürün
 
-- Ödeme sağlayıcısı genişletilebilir bir yapı ile kurulacak.
-- `PaymentGatewayInterface` arayüzü oluşturulacak.
-- PayTR veya iyzico gibi sağlayıcılar için ayrı adapter sınıfları yazılabilecek.
-- Ödeme sağlayıcısı bilgileri `config/payment.php` dosyasında tutulacak.
-- API key, secret key ve hassas bilgiler asla public klasörüne konulmayacak.
-- Kart numarası, CVV ve kart son kullanma tarihi veritabanına veya loglara kaydedilmeyecek.
-- 3D Secure akışı desteklenecek.
-- Ödeme callback işlemlerinde imza/hash doğrulaması yapılacak.
-- Başarılı ödemede sipariş durumu `paid`, ödeme durumu `completed` olarak güncellenecek.
-- Başarısız ödemede sipariş durumu `payment_failed`, ödeme durumu `failed` olarak güncellenecek.
-- Ödeme logları `payment_logs` tablosunda tutulacak; hassas veriler maskelenecek.
+Ad, slug, SKU, barkod, kısa/detay açıklama, price, discount_price, KDV, stok, birim (adet/kg/gram/paket/litre), ağırlık, menşe, saklama, raf ömrü, alerjen, SEO, aktif/öne çıkan. Çoklu görsel, kategori/alt kategori, marka, varyant, stok takibi.
 
-## Güvenlik Kuralları
+## Stok
 
-- Tüm kullanıcı girdileri doğrulanacak.
-- Tüm SQL sorguları PDO prepared statement ile yazılacak.
-- Tüm formlarda CSRF token kullanılacak.
-- XSS saldırılarına karşı çıktı escaping yapılacak.
-- Şifreler `password_hash()` ile saklanacak.
-- Şifre doğrulama `password_verify()` ile yapılacak.
-- Session cookie’lerinde `HttpOnly`, `Secure` ve `SameSite` ayarları kullanılacak.
-- Admin paneline yalnızca yetkili kullanıcılar erişebilecek.
-- Müşteri girişi/kaydı `/giris`, `/kayit`, `/cikis` route'larındadır; kayıtta `user_type` formdan alınmaz, giriş hata mesajı hesap bilgisi sızdırmaz, giriş sonrası dönüş adresi (`next`) yalnızca güvenli site içi yollarla sınırlıdır.
-- Müşteri girişinde rate limiting henüz yok (`Request::ip()` borcuna bağlı); sunucu internete açılmadan çözülmelidir.
-- Yetkilendirme `users.user_type` ENUM ile yönetilir: panel erişimi `admin` ve `staff`, tam yönetici yetkisi yalnızca `admin`. `roles` ve `permissions` tabloları şu aşamada yoktur.
-- Admin girişinde brute-force koruması için rate limiting uygulanacak.(henüz yok; Request::ip() proxy düzeltmesinden sonra. Bu çözülene kadar sunucu internete açılmaz.)
-- Dosya yüklemelerinde uzantı, MIME tipi, dosya boyutu ve gerçek içerik kontrolü yapılacak.
-- Yüklenen dosyalara rastgele ve güvenli dosya adı verilecek.
-- Production ortamında hata detayları kullanıcıya gösterilmeyecek.
-- Hatalar `storage/logs` klasörüne yazılacak.
-- `.env` ve `config/payment.php` dosyaları Claude tarafından okunmaz.
-- `.env`, `storage/sessions/*` ve `storage/logs/*` Git takibine alınmaz.
-- Veritabanı ve yüklenen dosyalar için düzenli yedekleme planlanacak.
+- Hareketler: `stock_movements`
+- Varyantsız → `products.stock_quantity`; varyantlı → `product_variants.stock_quantity`
+- Sipariş + stok düşümü aynı transaction
 
-## Bilinen Teknik Borçlar
+## Sepet & Sipariş
 
-- `Request::ip()` şu aşamada değiştirilmez. Proxy veya Cloudflare arkasına geçilince ayrı güvenlik görevi olarak çözülür ve admin rate limiting'den önce tamamlanmalıdır.
-- Güvenlik başlıkları, SRI ve 405 yanıtı düzeltmesi ayrı görevlerde yapılır.
-- E-posta doğrulaması (FR-051) ve şifre sıfırlama (FR-052) henüz yok.
+- Misafir sepeti **sadece session** (`$_SESSION['cart']['items']`)
+- `carts.user_id NOT NULL`; `session_id` kullanılmaz
+- Girişte `CartService::mergeGuestCart()` (transaction, stok sınırı)
+- `cart_items.variant_key` VIRTUAL; UNIQUE `(cart_id, product_id, variant_key)`
+- Sepet: Fetch API; stok kontrolü zorunlu
+- Sipariş: transaction içinde stok düş + sepet temizle
+- Sipariş no: `ASY-YYYYMMDD-NNNNNN`
+- Durumlar: `pending, awaiting_payment, paid, preparing, shipped, delivered, cancelled, payment_failed, returned`
+- `payment_status`: `unpaid, paid, failed, refunded, partially_refunded`
+- `customer_email` zorunlu; `customer_phone` opsiyonel (misafir takibi)
+- Durum geçmişi → `order_status_history`
+- `payments.order_id` / `shipments.order_id` UNIQUE değil (çoklu deneme / parçalı gönderim)
 
-## Admin Panel Kuralları
+## Kupon
 
-Admin paneli aşağıdaki modülleri içerecektir:
+- Fiziksel silme yok → `is_active=0` veya `deleted_at`
+- Sorguda `deleted_at IS NULL` zorunlu
+- Limit: `used_count` (COUNT(*) değil)
+- Kullanım yalnızca transaction: eklerken artır, iptalde azalt
 
-- Dashboard
-- Kategori yönetimi
-- Marka yönetimi
-- Ürün yönetimi
-- Ürün görseli yönetimi
-- Varyant yönetimi
-- Stok yönetimi
-- Sipariş yönetimi
-- Müşteri yönetimi
-- Kupon yönetimi
-- Kargo yönetimi
-- Raporlama
-- Site ayarları
+## Ödeme
 
-Admin paneli Bootstrap 5 ile responsive olacak ve masaüstü, tablet ile mobil cihazlarda düzgün çalışacaktır.
+- `PaymentGatewayInterface` + adapter (PayTR/iyzico)
+- Config: `config/payment.php`; key’ler public’te olmaz
+- Kart verisi DB/log’a yazılmaz; 3D Secure; callback imza doğrulama
+- Başarı → order `paid`, payment `completed`; hata → `payment_failed` / `failed`
+- Loglar: `payment_logs` (hassas veri maskeli)
 
-## Frontend Kuralları
+## Güvenlik
 
-- Bootstrap 5 kullanılacak.
-- Mobil öncelikli responsive tasarım uygulanacak.
-- Ana sayfada öne çıkan ürünler, kategoriler ve kampanyalar gösterilecek.
-- Ürün listeleme sayfasında arama, kategori filtresi, fiyat filtresi ve sayfalama bulunacak.
-- Ürün detay sayfasında görsel galerisi, stok durumu, sepete ekleme ve ürün bilgileri yer alacak.
-- Sepet sayfasında adet güncelleme, ürün silme ve toplam tutar hesaplama AJAX ile yapılacak.
-- Checkout sürecinde teslimat adresi, fatura adresi, kargo yöntemi, ödeme yöntemi ve sipariş özeti gösterilecek.
-- Kullanıcıya işlem sonuçları için anlaşılır başarı ve hata mesajları gösterilecek.
-- JavaScript işlemlerinde loading state ve hata yönetimi bulunacak.
+- PDO prepared, CSRF tüm formlarda, XSS escape, `password_hash`/`verify`
+- Session: HttpOnly, Secure, SameSite
+- Yetki: `users.user_type` ENUM (`admin`/`staff` panel, sadece `admin` tam yetki); roles/permissions yok
+- Müşteri: `/giris`, `/kayit`, `/cikis`; `user_type` formdan alınmaz; hata mesajı sızdırmaz; `next` sadece güvenli yol
+- Rate limiting henüz yok (`Request::ip()` borcu); sunucu internete açılmadan çözülecek
+- Upload: uzantı + MIME + boyut + içerik; rastgele ad
+- Production’da hata detayı yok → `storage/logs`
+- `.env`, `storage/sessions/*`, `storage/logs/*` Git dışı; Claude `.env` / `payment.php` okumaz
 
-## SEO Kuralları
+## Teknik Borç
 
-- Tüm ürün ve kategori sayfaları SEO dostu URL kullanacak.
-- URL yapısı örneği: `/urun/urun-adi`
-- Her ürün için `meta_title` ve `meta_description` alanları olacak.
-- Ürün görsellerinde `alt` etiketi kullanılacak.
-- Canonical URL desteği eklenecek.
-- Sitemap.xml ve robots.txt dosyaları oluşturulacak.
-- Google Search Console ve Google Analytics 4 entegrasyonu planlanacak.
+- `Request::ip()` proxy düzeltmesi (rate limiting’den önce)
+- Güvenlik başlıkları, SRI, 405 JSON → ayrı görev
+- E-posta doğrulama (FR-051), şifre sıfırlama (FR-052) yok
 
-## Yasal Uyumluluk
+## Admin Panel
 
-Aşağıdaki sayfalar ve metinler projede yer almalıdır:
+Dashboard, kategori, marka, ürün, görsel, varyant, stok, sipariş, müşteri, kupon, kargo, rapor, ayarlar. Bootstrap 5, responsive.
 
-- Ön bilgilendirme formu
-- Mesafeli satış sözleşmesi
-- İade ve cayma hakkı politikası
-- KVKK aydınlatma metni
-- Çerez politikası
-- Gizlilik politikası
-- Teslimat ve kargo politikası
-- İletişim sayfası
-- Hakkımızda sayfası
+## Frontend
 
-Gıda ürünlerinde; içerik, alerjen, menşe, raf ömrü, saklama koşulu ve tüketim tarihi bilgileri eksiksiz gösterilmelidir.
+- Mobil öncelikli Bootstrap 5
+- Ana sayfa: öne çıkan, kategori, kampanya
+- Liste: arama, kategori/fiyat filtresi, sayfalama
+- Detay: galeri, stok, sepete ekle
+- Sepet: AJAX adet/sil/toplam
+- Checkout: adres, kargo, ödeme, özet
+- Loading state + hata yönetimi
+
+## SEO & Yasal
+
+- URL: `/urun/urun-adi`; meta_title/description; alt; canonical; sitemap; robots.txt
+- Sayfalar: ön bilgilendirme, mesafeli satış, iade/cayma, KVKK, çerez, gizlilik, teslimat, iletişim, hakkımızda
+- Gıda: içerik, alerjen, menşe, raf ömrü, saklama, tüketim tarihi zorunlu
 
 ## Geliştirme Sırası
 
-Claude aşağıdaki sırayı takip edecektir:
-
-1. MVC çekirdek altyapısı (tamamlandı)
-2. Veritabanı migration dosyaları (001–018 tamamlandı)
-3. Kategori ve marka yönetimi (tamamlandı; görsel/logo dahil)
-4. Ürün yönetimi (model, controller, liste ve form view'ları tamamlandı)
-5. Ürün görselleri ve varyantlar (tamamlandı)
-6. Stok yönetimi (tamamlandı)
-7. Admin paneli (dashboard tamamlandı)
-8. Sepet modülü, vitrin ürün listesi/detayı ve müşteri giriş/kayıt (model, servis, controller, view ve route'lar yazıldı; gerçek MySQL ile elle test bekliyor)
-9. Sipariş modülü
-10. Ödeme entegrasyonu
-11. Kargo ve iade yönetimi
-12. E-posta bildirimleri
+1. MVC çekirdek ✅
+2. Migration 001–018 ✅
+3. Kategori/marka ✅
+4. Ürün ✅
+5. Görsel + varyant ✅
+6. Stok ✅
+7. Admin dashboard ✅
+8. Sepet + vitrin ürün + müşteri auth ✅ (MySQL elle test bekliyor)
+9. Sipariş
+10. Ödeme
+11. Kargo + iade
+12. E-posta
 13. Raporlama
-14. SEO ve performans iyileştirmeleri
-15. Yayına alma hazırlığı
+14. SEO / performans
+15. Yayın
 
-## Çalışma Kuralları
+## Zorunlu İş Akışı
 
-- Claude tek seferde tüm projeyi yazmayacaktır.
-- Claude her adımda yalnızca ilgili modülü geliştirecektir.
-- Her adımın başında yapılacak işlerin listesi verilecektir.
-- Her adımın sonunda oluşturulan veya değiştirilen dosyalar listelenecektir.
-- Her dosyanın tam içeriği verilecektir.
-- Kod çalıştırılamıyorsa kurulum ve test adımları net şekilde açıklanacaktır.
-- Her modül tamamlandıktan sonra kullanıcı onayı beklenecektir.
-- Kullanıcı onay vermeden sonraki modüle geçilmeyecektir.
-- Hata oluşursa önce kök neden açıklanacak, ardından düzeltme yapılacaktır.
-- Gereksiz dosya, gereksiz bağımlılık ve tekrar eden kod yazılmayacaktır.
-
-
-## ZORUNLU İŞ AKIŞI
-
-Her görevde şu sıra izlenecek:
-
-1. Önce şu dosyaları oku:
-   - DECISIONS.md
-   - PROJE-DURUMU.md
-   - DATABASE-DEPENDENCIES.md
-   - TEST-COMMANDS.md
-
-2. Görevi tek dosyaya indir.
-
-3. Kod yazmadan önce şu raporu ver:
-   - Etkilenecek dosya
-   - Bağımlılıklar
-   - Alınacak kararlar
-   - Varsa şema değişikliği
-   - Test planı
-
-4. Kullanıcı onayı olmadan dosya oluşturma veya değiştirme.
-
-5. Her seferinde yalnızca BİR dosya üret.
-
-6. Dosyanın tam içeriğini ver.
-
-7. Dosya sonunda şunu yaz:
-   "DEVAM yazarsan sıradaki dosyaya geçeceğim."
-
-8. Kullanıcı 'DEVAM' yazmadan sonraki dosyaya geçme.
-
-9. Her dosya sonunda şu kontrolleri yap:
-   - PHP dosyası ise: php -l <dosya>
-   - SQL migration ise: bağımlılık sırasını kontrol et
-   - Model ise: PDO prepared statement kullanıldığını kontrol et
-   - View ise: XSS escaping kontrolü yap
-   - Controller ise: CSRF ve yetkilendirme kontrolü yap
-
-10. Görev bitince PROJE-DURUMU.md dosyasını güncelle.
+1. Oku: `DECISIONS.md`, `PROJE-DURUMU.md`, `DATABASE-DEPENDENCIES.md`, `TEST-COMMANDS.md`
+2. Görevi tek dosyaya indir
+3. Kod öncesi rapor: etkilenen dosya, bağımlılık, karar, şema, test planı
+4. Onay olmadan dosya yazma/değiştirme
+5. Her seferinde **bir** dosya; tam içerik ver
+6. Sonunda: “DEVAM yazarsan sıradaki dosyaya geçeceğim.”
+7. `DEVAM` olmadan sonraki dosyaya geçme
+8. Kontroller: `php -l` · migration bağımlılık · Model→PDO · View→XSS · Controller→CSRF/yetki
+9. Görev bitince `PROJE-DURUMU.md` güncelle

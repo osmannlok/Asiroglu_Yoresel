@@ -1,236 +1,139 @@
 # Alınmış Mimari Kararlar
 
-> Bu dosya projenin mimari kararlarının tek kaynağıdır.
-> `CLAUDE.md` ile çelişki olursa bu dosya önceliklidir.
-KARAR 1 — BELGE HİYERARŞİSİ:
+> Mimari kararların tek kaynağı. `CLAUDE.md` ile çelişirse bu dosya önceliklidir.
 
-Projenin belge hiyerarşisi şu şekilde olacak:
+## Belge Hiyerarşisi
 
-1. DECISIONS.md:
-   Mimari, veritabanı, güvenlik ve uygulama kararlarının tek kaynağıdır.
-   Diğer belgelerle çelişirse DECISIONS.md geçerlidir.
+1. **DECISIONS.md** — mimari, DB, güvenlik, uygulama kararları (tek kaynak)
+2. **GEREKSINIMLER.MD** — FR / kabul kriterleri referansı; mimari kaynak değil
+3. **CLAUDE.md** — çalışma kuralları; DECISIONS ile çelişemez
+4. **database/migrations** — güncel şema kaynağı
+5. **database-schema.sql** — yalnızca başlangıç referansı, çalıştırılmaz
 
-2. GEREKSINIMLER.MD:
-   İş gereksinimleri, FR numaraları ve kabul kriterleri için referanstır.
-   Mimari karar kaynağı değildir.
-   DECISIONS.md ile çelişen maddeleri DECISIONS.md'e göre düzeltilecektir.
+## Veritabanı & Migration
 
-3. CLAUDE.md:
-   Claude Code için kalıcı çalışma kurallarını içerir.
-   DECISIONS.md ile çelişemez.
-   Çelişki tespit edilirse DECISIONS.md kazanır.
+- MySQL 8 / MariaDB · utf8mb4_unicode_ci · InnoDB · PDO prepared
+- Kaynak: `database/migrations`. Sıra: `DATABASE-DEPENDENCIES.md`
+- Dosya adı: `NNN_create_<tablo_veya_grup>.sql`
+- Çalışmış migration değiştirilmez → yeni dosya, son numaradan sonra
+- `migrate.php`: dosya adı sırası, checksum → `schema_migrations`; değişirse durur
+- DDL geri alınamaz; hata → dosya kaydedilmez, tablolar elle temizlenir
 
-4. database/migrations klasörü:
-   Gerçek ve güncel veritabanı yapısının kaynağıdır.
+## Stok
 
-5. database-schema.sql:
-   Yalnızca başlangıç referansıdır.
-   Güncel veritabanı kaynağı değildir.
+- `stocks` tablosu yok → hareketler `stock_movements`
+- Varyantsız: `products.stock_quantity` · Varyantlı: `product_variants.stock_quantity`
+- Sipariş + stok düşümü aynı transaction
+- `stock_movements` yalnızca eklenir; FOR UPDATE + transaction; stok negatife düşemez
+- Manuel: neden zorunlu (FR-026). Form: `incoming|outgoing|return|correction`; `reservation` sistem
+- `correction`: girilen = hedef stok; kaydedilen = farkın mutlak değeri
+- Varyantlı ürüne varyantsız hareket yazılamaz
+- Başlangıç stoğu: kayıt 0 ile açılır; >0 ise `incoming` aynı transaction’da
 
-## Veritabanı
+## Sepet
 
-- Veritabanı: MySQL 8 / MariaDB
-- Charset: utf8mb4
-- Collation: utf8mb4_unicode_ci
-- Engine: InnoDB
-- Tüm sorgular PDO prepared statement ile yazılır.
-- `database-schema.sql` yalnızca başlangıç referansıdır.
-- Gerçek ve güncel veritabanı kaynağı `database/migrations` klasöründeki migration dosyalarıdır.
+- Misafir: **sadece session** `$_SESSION['cart']['items']` — DB’ye yazılmaz
+- Üye: `carts` + `cart_items`; `carts.user_id NOT NULL`; `session_id` rezerve, kullanılmaz
+- Girişte `CartService::mergeGuestCart()` (transaction, stok sınırı; sığmayan → uyarı)
+- `variant_key` VIRTUAL: `IFNULL(product_variant_id, 0)`; UNIQUE `(cart_id, product_id, variant_key)`
+- Kalem anahtarı: misafir `p{id}` / `p{id}v{vid}`, üye `cart_items.id`
+- Max 50 kalem, kalem başına max 1000 adet
+- Sepete ekle/güncelle: stok + varyant + vitrin görünürlüğü; varyantlıda varyant zorunlu
+- Fiyat bilgilendirme; siparişte güncel fiyat/stok yeniden kontrol
+- Sipariş sonrası sepet `status = converted`
 
-## Migration Kuralları
+## Sipariş
 
-- İlişkili tablo grupları tek migration dosyasında olabilir.
-- Migration sırası foreign key bağımlılıklarına göre belirlenir.
-- Dosya adı: NNN_create_<tablo_veya_grup>.sql
-- Migration sırası DATABASE-DEPENDENCIES.md dosyasına göre belirlenir.
-- Aynı kolon iki kez eklenmez.
-- Bir migration çalıştıysa dosyası değiştirilmez.
-- database/migrate.php migration'ları dosya adı sırasıyla çalıştırır; başarılıları schema_migrations'a checksum ile kaydeder.
-- Çalışmış dosya değişirse migrate.php durur. Yeni dosya, uygulanmış son dosyadan sonra numaralandırılır.
-- MySQL'de DDL geri alınamaz; dosya ortasında hata olursa o dosya kaydedilmez ve oluşan tablolar elle temizlenir.
+- No: `ASY-YYYYMMDD-NNNNNN` (NNNNNN = orders.id, 6 hane). Önce `TMP-<rand>`, ID sonrası güncelle
+- Durumlar: `pending, awaiting_payment, paid, preparing, shipped, delivered, cancelled, payment_failed, returned`
+- `payment_status`: `unpaid, paid, failed, refunded, partially_refunded`
+- `customer_email` NOT NULL · `customer_phone` NULL · idx_orders_customer_email
+- `order_items.product_id` / `product_variant_id`: ON DELETE SET NULL
+- Geçmiş: `order_status_history`
+- `payments.order_id` / `shipments.order_id`: UNIQUE değil (çoklu deneme / parçalı gönderim)
 
-## Stok Kuralları
+### Order modeli
 
-- stocks tablosu yoktur.
-- Stok hareketleri stock_movements tablosunda tutulur.
-- Varyantsız üründe stok: products.stock_quantity
-- Varyantlı üründe stok: product_variants.stock_quantity
-- Sipariş oluşturma ve stok düşürme aynı transaction içinde yapılır.
+- Yazma: yalnızca `place()` ve `changeStatus()`; `create/update/delete` kapalı
+- Fiyat: sepet bilgilendirme; siparişte DB’den yeniden oku (ad, SKU, fiyat, KDV) → anlık kopya
+- Tutar (KDV dahil): `subtotal` = kalem toplamı · `vat_total` = subtotal içi KDV · `grand_total` = subtotal − discount + shipping
+- Stok sipariş oluşurken düşer (FR-076 sapması, bilinçli). `payment_failed` stoğu tutar; iptalde `incoming` (`reference_type=order_cancel`) geri verir
+- Geçişler (`TRANSITIONS`):
+  - pending → awaiting_payment, paid, preparing, cancelled
+  - awaiting_payment → paid, payment_failed, cancelled
+  - payment_failed → awaiting_payment, cancelled
+  - paid → preparing, cancelled
+  - preparing → shipped, cancelled
+  - shipped → delivered, returned
+  - delivered → returned
+  - cancelled, returned = son
+- Başlangıç: `pending` (kapıda) veya `awaiting_payment` (kart/havale)
+- `payment_status` eşleme: paid→paid, payment_failed→failed
+- Kupon henüz yok → discount_total=0, coupon_id=NULL
+- Misafir takip: numara + e-posta; üye: `findForUser()` yalnızca sahip
 
-## Sepet Kuralları
+## Kupon
 
-- carts yalnızca giriş yapmış kullanıcıların sepetleri içindir; carts.user_id her zaman dolu olmalıdır (NOT NULL).
-- carts.session_id rezerve alandır, şu aşamada kullanılmaz.
-- Misafir sepeti yalnızca PHP session'da tutulur (bkz. MİSAFİR SEPETİ).
-- cart_items.variant_key VIRTUAL generated column olur.
-- variant_key: IFNULL(product_variant_id, 0)
-- UNIQUE index: uq_cart_item_product (cart_id, product_id, variant_key)
-- cart_items.product_variant_id FK: ON DELETE CASCADE
+- Soft delete: `deleted_at` · sorguda `IS NULL` zorunlu · fiziksel silme yok
+- `used_count` korunur; limit kontrolünde COUNT(*) yerine kullanılır
+- Kullanım yalnızca transaction: eklerken artır, iptalde azalt
+- `coupon_usages.order_id` FK: orders sonrası ALTER; ON DELETE SET NULL
 
-## Sipariş Kuralları
+## Ödeme / Kargo
 
-- Sipariş numarası: ASY-YYYYMMDD-NNNNNN
-- Sipariş durumları İngilizce olur.
-- Durumlar: pending, awaiting_payment, paid, preparing, shipped, delivered, cancelled, payment_failed, returned
-- Ödeme durumları: unpaid, paid, failed, refunded, partially_refunded
-- orders.customer_email VARCHAR(191) NOT NULL olur.
-- orders.customer_phone VARCHAR(20) NULL olabilir.
-- orders tablosunda idx_orders_customer_email (customer_email) indeksi bulunur.
-- order_items.product_id ve product_variant_id ON DELETE SET NULL olur.
-- Sipariş geçmişi order_status_history tablosunda tutulur.
-MİSAFİR SEPETİ:
+- Kart no, CVV, SKT → DB/log’a yazılmaz
+- `.env` ve `config/payment.php` Claude tarafından okunmaz
 
-Misafir sepeti yalnızca PHP session içinde tutulacaktır.
+## Ürün
 
-- Ziyaretçi sepete ürün eklediğinde veritabanına carts veya cart_items 
-  kaydı açılmayacaktır.
-- Misafir sepeti session içinde tutulacaktır.
-- Sepet verisi session'da şu yapıda tutulabilir:
-  $_SESSION['cart'] = [
-      'items' => [
-          [
-              'product_id' => 5,
-              'product_variant_id' => null,
-              'quantity' => 2
-          ]
-      ]
-  ];
+- Soft delete; sipariş geçmişi anlık kopya sayesinde etkilenmez
+- `stock_quantity` yalnızca oluşturmada başlangıç; sonra stok modülünden
+- Varyantlı üründe `products.stock_quantity` yazılamaz
+- SKU ürün+varyant arasında unique (`Product::skuExists`)
+- Vitrin: pasif/silinmiş kategori veya marka ürünü listelenmez
+- Fiyat: ondalık ayırıcı nokta (virgül yok)
 
-- Kullanıcı giriş yaptığında session sepeti, kullanıcının mevcut DB sepetiyle 
-  birleştirilecek.
-- Aynı ürün ve aynı varyant varsa adetler toplanacak.
-- Aynı ürün + varyant kombinasyonu yoksa yeni sepet kalemi oluşturulacak.
-- Birleştirme işlemi transaction içinde yapılacak.
-- Stok kontrolü birleştirme sırasında yapılacak.
-- Stok yetersizse kullanıcı bilgilendirilecek ve mümkün olan maksimum adet eklenmeyecek; 
-  sepet kaydı stok sınırını aşmayacak.
+## Görsel (Uploader)
 
-- Giriş yapmış kullanıcı için sepet carts ve cart_items tablolarında tutulacak.
-- Sipariş oluşturulduğunda kullanıcı sepetinin status değeri 'converted' olacak.
+- jpg/jpeg/png/webp · max 2 MB · 6000×6000 · MIME finfo + getimagesize · uzantı=MIME
+- Rastgele ad; DB’ye göreli yol · klasör: products|categories|brands|banners
+- Tek ana görsel; ilk otomatik ana · max 10 görsel/ürün
+- Kayıt fail → yüklenen dosyalar silinir; silmede önce DB, sonra dosya
 
-- carts.session_id alanı şu aşamada misafir sepeti için kullanılmayacak.
-- Bu alan ileride terk edilmiş sepet analizi veya kalıcı misafir sepeti 
-  özelliği için rezerve olarak kalacak.
+## Yönetim Paneli
 
-- carts tablosu yalnızca giriş yapmış kullanıcıların sepetleri için kullanılacak.
-- carts.user_id NOT NULL'dır. Uygulandı: 011 migration'ı hiçbir veritabanına uygulanmadan
-  önce (2026-10-31) bu karara göre düzeltildi; ALTER TABLE gerekmedi.
-- Uygulandı: 011 migration'ında (2026-10-31).
+- Admin route’lar `/admin` + AdminMiddleware grubu; giriş/çıkış grup dışı
+- Erişim: `admin` + `staff`; tam yetki yalnızca `admin`
+- Slug: boşsa addan üret + benzersizleştir; elle çakışırsa hata; UNIQUE soft-delete’li de sayar
+- Soft delete: alt kategorisi / silinmemiş ürünü olan kategori veya marka silinemez → önce pasifleştir
+- CRUD: POST + CSRF, silmede ortak onay modalı, hata → old flash
 
-- Sepete ekleme ve adet güncellemede (misafir ve üye) stok, varyant ve vitrin görünürlüğü denetlenir; varyantlı üründe varyant seçimi zorunludur.
-- Sepet kalemi anahtarı: misafirde `p{ürün}` / `p{ürün}v{varyant}`, üyede `cart_items.id`.
-- Sepette en fazla 50 farklı kalem, kalem başına en fazla 1000 adet.
-- Sepetteki fiyat bilgilendirme amaçlıdır; sipariş oluşturulurken güncel fiyat ve stokla yeniden kontrol edilir.
-- Birleştirme `CartService::mergeGuestCart()` ile yapılır; stoğa sığmayan kalem eklenmez ve kullanıcıya uyarı olarak bildirilir.
+## Müşteri Auth
 
-## Ödeme ve Kargo İlişkileri
+- Route: `GET/POST /giris`, `GET/POST /kayit`, `POST /cikis` (AdminMiddleware dışı)
+- Kayıt: `user_type` formdan alınmaz → `createUser()` default `customer`
+- Şifre: ≥8 karakter, harf+rakam, ≤72 bayt; giriş şifresi Validator’dan geçmez; flash/log’a yazılmaz
+- Başarısız giriş: tek mesaj “E-posta veya şifre hatalı.”
+- Login/register sonrası: session ID + CSRF yenile (fixation); `mergeGuestCart()` (hata girişi engellemez)
+- `next`: sadece güvenli site-içi yol; `//`, `..`, `/giris|/kayit|/cikis` yok
+- Çıkış: yalnızca POST + CSRF
+- Ortak oturum: admin/staff vitrinden de girebilir; müşteri panele giremez
+- FR-051 (e-posta doğrulama), FR-052 (şifre sıfırlama), rate limiting yok
 
-- payments.order_id için UNIQUE eklenmez.
-- shipments.order_id için UNIQUE eklenmez.
-- Gerekçe: Bir sipariş için birden fazla ödeme denemesi ve parçalı gönderim olabilir.
+## Vitrin Menü
 
-## Kupon Kuralları
+- Ana Sayfa, Ürünler, arama (`GET /urunler?q=`), Sepet, Giriş/Kayıt veya ad/Çıkış; staff → Yönetim Paneli
+- Sepet rozeti: sunucuda `CartService::count()`; `/sepet/` POST yanıtındaki `count` ile güncellenir
 
-- coupons.deleted_at DATETIME NULL alanı vardır.
-- Kuponlar fiziksel silinmez.
-- Admin panelinde yalnızca is_active = 0 veya deleted_at doldurma kullanılır.
-- Kupon sorgularında deleted_at IS NULL koşulu zorunludur.
-- coupons.used_count korunur.
-- Kupon kullanımı yalnızca transaction içinde yönetilir.
-- coupon_usages kaydı eklenirken used_count aynı transaction içinde artırılır.
-- Sipariş iptalinde coupon_usages kaydı silinirken used_count azaltılır.
-- Kupon limit kontrolünde COUNT(*) yerine used_count kullanılır.
-- coupon_usages.order_id foreign key, orders migration sonrası ALTER TABLE ile eklenir.
-- coupon_usages.order_id foreign key davranışı: ON DELETE SET NULL
+## Teknik Borç
 
-## Kapsam
+- `Request::ip()` proxy düzeltmesi (rate limiting’den önce)
+- Güvenlik başlıkları, SRI, 405 JSON → ayrı görev
+- Müşteri rate limiting yok
+- Layout `$_GET['q']` / `REQUEST_URI` doğrudan okur → ileride controller’dan geçirilecek
 
-- Blog modülü şu aşamada kapsam dışıdır.
+## Diğer
 
-## Güvenlik
-
-- Kart numarası, CVV ve son kullanma tarihi ne veritabanına ne de loglara yazılır.
-- .env ve config/payment.php dosyaları Claude tarafından okunmaz.
-- Tüm formlarda CSRF token kullanılır.
-- Şifreler password_hash() ile saklanır.
-- Admin paneli yetkilendirme ile korunur.
-- Mimari kararların tek kaynağı bu dosya, PROJE-DURUMU.md yalnızca özetler.
-
-## Depo ve Dosya Yönetimi
-
-- Proje belgeleri (DECISIONS.md, CLAUDE.md, PROJE-DURUMU.md, DATABASE-DEPENDENCIES.md,
-  TEST-COMMANDS.md, GEREKSİNİMLER.MD vb.) md/ klasöründe tutulur ve esastır (2026-10-31).
-- Belgelerin kopyası kökte veya başka klasörlerde tutulmaz.
-- storage/sessions/ Git takibine alınmaz.
-  - .gitignore: storage/sessions/* ve !storage/sessions/.gitkeep
-- storage/logs/ Git takibine alınmaz.
-  - .gitignore: storage/logs/* ve !storage/logs/.gitkeep
-- .env dosyası Git takibine alınmaz.
-  - .gitignore: .env
-
-## Bilinen Teknik Borçlar
-
-- Request::ip() şu aşamada değiştirilmez.
-- Proxy veya Cloudflare arkasına geçildiğinde güvenilir proxy başlıkları ile IP tespiti yeniden değerlendirilir.
-- Proxy uyumu ayrı bir güvenlik görevi olarak planlanır ve admin rate limiting'den önce çözülmelidir.
-- Güvenlik başlıkları, SRI ve 405 yanıtı düzeltmesi ayrı görevlerde yapılır.
-- Müşteri girişi ve kaydı için rate limiting yoktur; admin rate limiting ile birlikte `Request::ip()` düzeltmesinden sonra ele alınır.
-- Layout, `$_GET['q']` ve `REQUEST_URI`'yi doğrudan okur; controller'dan değişken geçirmek ileride temizlenecektir.
-
-## Yönetim Paneli Kuralları
-
-- Tüm admin route'ları `/admin` prefix'li `AdminMiddleware` grubunun içindedir. Yalnızca giriş/çıkış grubun dışındadır.
-- Panel erişimi `admin` ve `staff`; tam yönetici yetkisi yalnızca `admin`.
-- Slug: boşsa addan üretilir ve benzersizleştirilir; elle girilen çakışırsa hata. UNIQUE indeks soft delete'li kayıtları da kapsar.
-- Silme soft delete'tir. Alt kategorisi veya silinmemiş ürünü olan kategori, silinmemiş ürünü olan marka silinemez; önce pasifleştirilir.
-- Kategori görseli ve marka logosu: Uploader yazıldı (2026-10-31). Formlara ekleme ayrı görevdir; formlara `enctype="multipart/form-data"` eklenmelidir.
-- Admin CRUD ekranları: POST + CSRF, silme için ortak onay modalı, hata durumunda eski girdi flash ile taşınır.
-  ## Ürün Kuralları
-
-  - Ürün silme soft delete'tir; sipariş geçmişi anlık kopya sayesinde etkilenmez.
-  - products.stock_quantity yalnızca oluşturmada başlangıç stoğu olarak yazılır; sonraki değişiklikler stok modülünden yapılır.
-  - Varyantlı üründe products.stock_quantity yazılamaz (Product::update reddeder).
-  - SKU ürünler ve varyantlar arasında benzersizdir (kontrol Product::skuExists).
-  - Vitrinde pasif/silinmiş kategori veya markadaki ürünler listelenmez.
-  - Fiyat girişinde ondalık ayırıcı nokta; virgül kabul edilmez.
-
-  ## Stok Hareketi Kuralları
-
-  - stock_movements yalnızca eklenir; güncelleme ve silme yoktur.
-  - Stok değişikliği ve hareket kaydı aynı transaction içinde yapılır; stok satırı FOR UPDATE ile kilitlenir.
-  - Stok negatife düşemez; çıkış mevcut stoğu aşamaz.
-  - Manuel harekette işlem nedeni zorunludur (FR-026).
-  - correction türünde girilen değer hedef stoktur; kaydedilen quantity farkın mutlak değeridir.
-  - Formdan yalnızca incoming, outgoing, return, correction kabul edilir; reservation sistem kaynaklıdır.
-  - Varyantı olan ürüne varyantsız hareket yazılamaz.
-  - Ürün veya varyant oluşturulurken başlangıç stoğu doğrudan yazılmaz; kayıt 0 stokla açılır ve başlangıç stoğu > 0 ise `incoming` hareketi aynı transaction içinde yazılır.
-
-  ## Görsel Yükleme Kuralları
-
-  - Uploader (App\Core): jpg, jpeg, png, webp; en fazla 2 MB ve 6000x6000 px.
-  - MIME finfo ile içerikten okunur, getimagesize ile doğrulanır; uzantı MIME ile tutarlı olmalıdır.
-  - Dosya adı rastgele üretilir; DB'ye yalnızca göreli yol yazılır.
-  - Hedef klasör beyaz listeden gelir: products, categories, brands, banners.
-  - Üründe tek ana görsel; ilk görsel otomatik ana olur.
-  - Ürün başına en fazla 10 görsel yüklenebilir.
-  - Kayıt başarısız olursa o istekte yüklenen dosyalar silinir; görsel silinirken önce DB kaydı, sonra dosya kaldırılır.
-  - Kategori görseli ve marka logosu da Uploader ile yüklenir (klasörler: categories, brands); formlarda enctype="multipart/form-data" kullanılır.
-
-  ## Müşteri Kimlik Doğrulama Kuralları
-
-- Müşteri route'ları: `GET/POST /giris`, `GET/POST /kayit`, `POST /cikis`. Admin girişinden (`/admin/giris`, `/admin/cikis`) ayrıdır ve `AdminMiddleware` dışındadır.
-- Kayıtta `user_type` formdan alınmaz; `User::createUser()` varsayılanı `customer` kullanılır.
-- Şifre: en az 8 karakter, en az bir harf ve bir rakam, en fazla 72 bayt. Giriş şifresi Validator'dan geçmez (boşluk anlamlıdır). Şifre flash'a ve loglara yazılmaz.
-- Başarısız girişte mesaj tektir: "E-posta veya şifre hatalı." Yanlış e-posta, yanlış şifre ve pasif/banlı hesap ayırt edilemez.
-- Giriş ve kayıttan sonra `Auth::login()` session ID ve CSRF token'ı yeniler (session fixation).
-- Giriş ve kayıttan sonra `CartService::mergeGuestCart()` çağrılır. Birleştirme hatası girişi engellemez; hata loglanır, session sepeti korunur. Sığmayan kalemler kullanıcıya bilgi mesajı olarak gösterilir.
-- Giriş sonrası dönüş adresi (`next`) yalnızca site içi, sabit karakter kümesine uyan yollarla sınırlıdır; `//`, `..`, `/giris`, `/kayit`, `/cikis` kabul edilmez.
-- Çıkış yalnızca POST ve CSRF korumalıdır.
-- Admin/staff kullanıcı vitrin girişinden de oturum açabilir (ortak oturum anahtarı). Müşteri hesabı admin paneline giremez.
-- E-posta doğrulaması (FR-051), şifre sıfırlama (FR-052) ve brute-force koruması bu aşamada yoktur; rate limiting `Request::ip()` düzeltmesine bağlıdır.
-
-## Vitrin Menüsü Kuralları
-
-- Ana layout menüsünde Ana Sayfa, Ürünler, arama formu (`GET /urunler?q=`), Sepet, ve oturum durumuna göre Giriş / Kayıt Ol veya ad / Çıkış bulunur. Staff kullanıcı için "Yönetim Paneli" bağlantısı gösterilir; menüde gizleme yetki kontrolü değildir.
-- Sepet rozeti ilk açılışta `CartService::count()` ile sunucuda hesaplanır; sayı veya oturum okunamazsa sayfa çökmez, rozet gizlenir ve hata loglanır.
-- Rozet sayfa yenilenmeden `/sepet/` altına yapılan başarılı POST yanıtlarındaki `count` değeriyle güncellenir.
+- Blog kapsam dışı
+- Belgeler `md/` altında esastır; kökte kopya tutulmaz
+- Git dışı: `.env`, `storage/sessions/*`, `storage/logs/*` (+ `.gitkeep`)
