@@ -18,6 +18,7 @@ use App\Controllers\Admin\DashboardController;
 use App\Controllers\Admin\ProductController;
 use App\Controllers\Admin\ProductImageController;
 use App\Controllers\Admin\ProductVariantController;
+use App\Controllers\Admin\ShippingMethodController;
 use App\Controllers\Admin\StockController;
 use App\Controllers\AuthController as StorefrontAuthController;
 use App\Controllers\CartController;
@@ -190,6 +191,17 @@ final class App
                 $router->get('/stok/hareket', [StockController::class, 'create']);
                 $router->post('/stok/hareket', [StockController::class, 'store']);
                 $router->get('/stok/gecmis', [StockController::class, 'history']);
+
+
+                // Kargo yöntemleri (FR-084, FR-085)
+                $router->get('/kargo', [ShippingMethodController::class, 'index']);
+                $router->get('/kargo/olustur', [ShippingMethodController::class, 'create']);
+                $router->post('/kargo', [ShippingMethodController::class, 'store']);
+                $router->get('/kargo/{id:\d+}/duzenle', [ShippingMethodController::class, 'edit']);
+                $router->post('/kargo/{id:\d+}/guncelle', [ShippingMethodController::class, 'update']);
+                $router->post('/kargo/{id:\d+}/durum', [ShippingMethodController::class, 'toggle']);
+
+
             }
         );
     }

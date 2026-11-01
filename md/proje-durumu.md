@@ -44,6 +44,8 @@
 - [ ] `php -l`: ShippingMethod, CheckoutService, CheckoutController, checkout views, App.php, cart/index
 - [ ] Checkout elle test (TEST-COMMANDS.md); en az bir shipping_methods satırı gerekir
 
+- [~] Admin kargo yöntemi CRUD (FR-084, FR-085): `ShippingMethodController`, `admin/shipping/index.php`, `admin/shipping/form.php` yazıldı. Route ve menü bağlanmadı, test edilmedi.
+
 ## 3. Migration’lar (001–018)
 
 | No | Tablolar |
@@ -83,12 +85,11 @@
 
 ## 5. Sıradaki
 
-1. Admin kargo yöntemleri CRUD (FR-085; şimdilik SQL ile eklenir)
-2. Hesabım sipariş sayfaları (liste, detay; findForUser)
-3. Coupon modeli + checkout/sipariş bağlama
-4. Payment modeli + PaymentGatewayInterface, kart/havale akışı
-5. Admin sipariş yönetimi, kargo takip no (shipments)
-6. İade → E-posta → Raporlama
+1. Hesabım sipariş sayfaları (liste, detay; findForUser)
+2. Coupon modeli + checkout/sipariş bağlama
+3. Payment modeli + PaymentGatewayInterface, kart/havale akışı
+4. Admin sipariş yönetimi, kargo takip no (shipments)
+5. İade → E-posta → Raporlama
 
 ## 6. Kritik Kararlar (özet)
 
@@ -105,6 +106,9 @@
 - Admin/vitrin oturumu ortak (`_auth_user_id`); müşteri `/admin/giris` yapamaz
 - Checkout: kargo eşiği kupon sonrası tutara göre (kupon yokken subtotal); sonuç sayfası `_last_order` oturumuyla açılır, numara URL'de yok
 - Başlangıç durumu: kapıda ödeme `pending`; kart/havale `awaiting_payment`
+- Kargo yöntemi silinmez, yalnızca aktif/pasif yapılır. `code` oluşturulduktan sonra değişmez. Son aktif yöntem kapatılamaz.
+- `shipping/index.php` ve `form.php` içinde `$this->csrfField()` kullanıldı. `variants/index.php` ile aynı yöntem olup olmadığı kontrol edilecek.
+- `index.php` Bootstrap Icons (`bi`) sınıfı kullanıyor. Layout'ta yüklü olup olmadığı kontrol edilecek.
 
 Tam liste → `DECISIONS.md`
 

@@ -41,6 +41,7 @@ $menuItems = [
     'brands'     => ['Markalar', '/admin/markalar', false],
     'products'   => ['Ürünler', '/admin/urunler', false],
     'stock'      => ['Stok', '/admin/stok', false],
+    'shipping'   => ['Kargo Yöntemleri', '/admin/kargo', false],
 ];
 
 // Flash bildirimleri: tür => Bootstrap alert sınıfı

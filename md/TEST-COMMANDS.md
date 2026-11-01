@@ -78,6 +78,9 @@ php -l app/Services/CheckoutService.php
 php -l app/Controllers/CheckoutController.php
 php -l app/Views/checkout/index.php
 php -l app/Views/checkout/complete.php
+php -l app/Controllers/Admin/ShippingMethodController.php
+php -l app/Views/admin/shipping/index.php
+php -l app/Views/admin/shipping/form.php
 
 ### Tüm PHP dosyalarını tek seferde tara
 
@@ -245,3 +248,17 @@ Elle test (migration 012 uygulandıktan sonra):
 9. Başka oturum/üye ile `/siparis/tamamlandi` → ana sayfa (G-05). Adreste `<script>` kaçırılmalı (G-02).
 10. Sepette "Ödemeye Geç" `/odeme`'ye gitmeli; stoksuz kalemde kilitli, kalem çıkarılınca aktifleşmeli.
 11. ShippingMethod: `calculateFee` eşik altında price, eşikte 0; `remainingForFreeShipping` eşikte null; `delete()` BadMethodCallException; negatif ücret/bozuk `code` reddedilmeli.
+
+### Kargo yöntemleri (/admin/kargo)
+1. Liste açılır, pasifler de görünür.
+2. Yeni yöntem: kod `standard`, ücret `49.90`, eşik boş → eklenir, listede "Eşik yok" yazar.
+3. Aynı kodla tekrar ekle → "Bu kod başka bir kargo yönteminde kullanılıyor."
+4. Kodda büyük harf veya boşluk gir → hata.
+5. Ücret `49,90` (virgül) gir → hata. Ücret `0` → kabul, listede "Ücretsiz".
+6. Eşik `0` gir → hata (en az 0.01).
+7. Düzenle: kod salt okunur. Ücreti değiştir, kaydet → liste güncellenir.
+8. Anahtar: bir yöntemi kapat/aç → sayfa yenilenmeden rozet değişir.
+9. Tek aktif yöntemi kapat (anahtar) → kırmızı uyarı, anahtar geri döner.
+10. Tek aktif yöntemi formdan "Satışta" işaretini kaldırarak kaydet → alan altında hata.
+11. CSRF'siz POST (token'ı sil) → reddedilir.
+12. Yönetici olmayan kullanıcı /admin/kargo → giriş sayfasına yönlenir.
