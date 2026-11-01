@@ -16,6 +16,8 @@
  *   yeniden kontrol edilir.
  * - Ekleme/güncelleme transaction içinde, sepet satırı FOR UPDATE ile
  *   kilitlenerek yapılır.
+ * - resolveSellable() ve assertQuantity() public'tir: CartService misafir
+ *   (session) sepetinde aynı stok/varyant/vitrin kurallarını bunlarla uygular.
  *
  * Tüm sorgular PDO prepared statement ile çalışır; $_GET / $_POST / $_SESSION
  * kullanılmaz.
@@ -95,7 +97,7 @@ final class Cart extends Model
     /**
      * Sepet kalemlerini ürün ve varyant bilgisiyle döndürür.
      * Vitrinde görünmeyen (pasif/silinmiş) ürünler de gelir; view bunları
-     * "satın alınamaz" olarak işaretleyebilsin diye 'available' alanı eklenir.
+     * "satın alınamaz" olarak işaretleyebilsin diye 'available_stock' alanı eklenir.
      *
      * @return list<array<string, mixed>>
      */
@@ -284,50 +286,20 @@ final class Cart extends Model
     }
 
     // -------------------------------------------------------------------------
-    // Yazma yasakları
-    // -------------------------------------------------------------------------
-
-    /**
-     * @param array<string, mixed> $data
-     *
-     * @throws BadMethodCallException Her zaman
-     */
-    public function create(array $data): int
-    {
-        throw new BadMethodCallException('Cart::create() kapalıdır. getOrCreateActive() kullanın.');
-    }
-
-    /**
-     * @param array<string, mixed> $data
-     *
-     * @throws BadMethodCallException Her zaman
-     */
-    public function update(int $id, array $data): bool
-    {
-        throw new BadMethodCallException('Cart::update() kapalıdır.');
-    }
-
-    /**
-     * @throws BadMethodCallException Her zaman
-     */
-    public function delete(int $id): bool
-    {
-        throw new BadMethodCallException('Cart::delete() kapalıdır. clear() kullanın.');
-    }
-
-    // -------------------------------------------------------------------------
-    // Dahili yardımcılar
+    // Satılabilirlik ve stok denetimi (CartService de kullanır)
     // -------------------------------------------------------------------------
 
     /**
      * Ürün/varyantın satın alınabilirliğini denetler ve stok ile güncel fiyatı döndürür.
      * Ürün vitrinde görünür olmalı (aktif, silinmemiş, kategori/marka aktif; FR-033).
      *
+     * Public'tir: CartService misafir (session) sepetinde aynı kuralları uygular.
+     *
      * @return array{stock: int, price: float}
      *
      * @throws InvalidArgumentException Kural ihlal edilirse
      */
-    private function resolveSellable(int $productId, ?int $variantId): array
+    public function resolveSellable(int $productId, ?int $variantId): array
     {
         $product = $this->fetchOne(
             'SELECT p.* FROM products p'
@@ -357,7 +329,8 @@ final class Cart extends Model
             ];
         }
 
-        $variant = (new ProductVariant())->findForProduct($variantId, $productId);
+        $variants = new ProductVariant();
+        $variant  = $variants->findForProduct($variantId, $productId);
 
         if ($variant === null || (int) $variant['is_active'] !== 1) {
             throw new InvalidArgumentException('Seçilen seçenek satışta değil.');
@@ -365,16 +338,18 @@ final class Cart extends Model
 
         return [
             'stock' => max(0, (int) $variant['stock_quantity']),
-            'price' => (new ProductVariant())->currentPrice($variant),
+            'price' => $variants->currentPrice($variant),
         ];
     }
 
     /**
      * Adedin stok ve üst sınır kurallarına uyduğunu denetler (FR-044).
      *
+     * Public'tir: CartService misafir (session) sepetinde aynı kuralı uygular.
+     *
      * @throws InvalidArgumentException Kural ihlal edilirse
      */
-    private function assertQuantity(int $quantity, int $stock): void
+    public function assertQuantity(int $quantity, int $stock): void
     {
         if ($stock <= 0) {
             throw new InvalidArgumentException('Bu ürün stokta yok.');
@@ -387,5 +362,37 @@ final class Cart extends Model
         if ($quantity > self::MAX_QUANTITY) {
             throw new InvalidArgumentException('Bir üründen en fazla ' . self::MAX_QUANTITY . ' adet alınabilir.');
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Yazma yasakları
+    // -------------------------------------------------------------------------
+
+    /**
+     * @param array<string, mixed> $data
+     *
+     * @throws BadMethodCallException Her zaman
+     */
+    public function create(array $data): int
+    {
+        throw new BadMethodCallException('Cart::create() kapalıdır. getOrCreateActive() kullanın.');
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     *
+     * @throws BadMethodCallException Her zaman
+     */
+    public function update(int $id, array $data): bool
+    {
+        throw new BadMethodCallException('Cart::update() kapalıdır.');
+    }
+
+    /**
+     * @throws BadMethodCallException Her zaman
+     */
+    public function delete(int $id): bool
+    {
+        throw new BadMethodCallException('Cart::delete() kapalıdır. clear() kullanın.');
     }
 }

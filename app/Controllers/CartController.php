@@ -18,6 +18,8 @@
  *   Türkçe mesajlardır ve 422 ile döner.
  * - Her başarılı yanıt güncel özeti içerir; arayüz sayfayı yenilemeden günceller.
  * - Girdiler Validator'dan geçer; çıktı kaçırma view'lardadır.
+ * - "key" kuralı dizi biçiminde verilir: KEY_PATTERN "|" içerdiği için metin
+ *   biçimindeki kural Validator tarafından yanlış bölünürdü.
  *
  * Gereksinimler: FR-040, FR-042, FR-043, FR-044, FR-045, NFR-003, NFR-004.
  */
@@ -137,7 +139,7 @@ final class CartController extends Controller
                 'quantity' => $this->scalar($request->input('quantity')),
             ],
             [
-                'key'      => 'required|string|max:25|regex:' . self::KEY_PATTERN,
+                'key'      => $this->keyRules(),
                 'quantity' => 'required|integer|min:0|max:1000',
             ],
             [
@@ -176,7 +178,7 @@ final class CartController extends Controller
     {
         $validator = Validator::make(
             ['key' => $this->scalar($request->input('key'))],
-            ['key' => 'required|string|max:25|regex:' . self::KEY_PATTERN],
+            ['key' => $this->keyRules()],
             ['key' => 'Sepet kalemi']
         );
 
@@ -196,6 +198,17 @@ final class CartController extends Controller
     // -------------------------------------------------------------------------
     // Dahili yardımcılar
     // -------------------------------------------------------------------------
+
+    /**
+     * Kalem anahtarı doğrulama kuralları. Desen "|" içerdiği için kurallar
+     * metin yerine dizi olarak verilir; Validator dizideki öğeleri bölmez.
+     *
+     * @return list<string>
+     */
+    private function keyRules(): array
+    {
+        return ['required', 'string', 'max:25', 'regex:' . self::KEY_PATTERN];
+    }
 
     /**
      * Başarılı yanıt: mesaj ve güncel özet.

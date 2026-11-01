@@ -16,9 +16,12 @@
  * - SKU, ürünler ve varyantlar arasında benzersizdir (farklı tablolar olduğu
  *   için kontrol modelde yapılır).
  * - Pasif/silinmiş kategorideki veya markadaki ürünler vitrinde listelenmez (FR-033).
+ * - Vitrin listesinde görüntülenen fiyat: varyantsız üründe geçerli fiyat
+ *   (indirim tarih aralığı içindeyse indirimli), varyantlı üründe en ucuz
+ *   aktif varyantın geçerli fiyatı ("başlayan fiyat").
  *
- * Gereksinimler: FR-002, FR-003, FR-010, FR-011, FR-015, FR-020, FR-024,
- * FR-033, FR-097.
+ * Gereksinimler: FR-002, FR-003, FR-004, FR-005, FR-006, FR-010, FR-011,
+ * FR-015, FR-020, FR-024, FR-033, FR-097.
  */
 
 declare(strict_types=1);
@@ -33,6 +36,17 @@ final class Product extends Model
     /** Sayfalamada tek sayfada izin verilen en yüksek kayıt sayısı */
     private const MAX_PER_PAGE = 100;
 
+    /** Vitrin sıralama seçenekleri (anahtar => ORDER BY; kullanıcı girdisi SQL'e girmez) */
+    private const SORT_ORDERS = [
+        'new'        => 'x.created_at DESC, x.id DESC',
+        'price_asc'  => 'x.display_price ASC, x.id ASC',
+        'price_desc' => 'x.display_price DESC, x.id DESC',
+        'name'       => 'x.name ASC, x.id ASC',
+    ];
+
+    /** Varsayılan vitrin sıralaması */
+    public const DEFAULT_SORT = 'new';
+
     /**
      * Vitrinde görünürlük koşulu (sabit SQL parçası, kullanıcı girdisi içermez).
      * "products p" tablosunu kullanan sorgulara eklenir. Kategori aktif ve
@@ -44,6 +58,20 @@ final class Product extends Model
 
     private const STOREFRONT_WHERE = ' p.is_active = 1 AND p.deleted_at IS NULL'
         . ' AND (p.brand_id IS NULL OR (b.is_active = 1 AND b.deleted_at IS NULL))';
+
+    /**
+     * Ürünün şu an geçerli fiyatı (sabit SQL ifadesi): indirim, tarih aralığı
+     * içindeyse (sınırlar boşsa kısıtsız) geçerlidir.
+     */
+    private const SQL_PRODUCT_PRICE = 'CASE WHEN p.discount_price IS NOT NULL AND p.discount_price < p.price'
+        . ' AND (p.discount_start_date IS NULL OR p.discount_start_date <= NOW())'
+        . ' AND (p.discount_end_date IS NULL OR p.discount_end_date >= NOW())'
+        . ' THEN p.discount_price ELSE p.price END';
+
+    /** En ucuz aktif varyantın geçerli fiyatı (sabit SQL ifadesi); aktif varyant yoksa NULL */
+    private const SQL_VARIANT_MIN_PRICE = '(SELECT MIN(CASE WHEN v.discount_price IS NOT NULL'
+        . ' AND v.discount_price < v.price THEN v.discount_price ELSE v.price END)'
+        . ' FROM product_variants v WHERE v.product_id = p.id AND v.is_active = 1)';
 
     protected string $table = 'products';
 
@@ -124,6 +152,105 @@ final class Product extends Model
             . ' ORDER BY p.created_at DESC, p.id DESC'
             . ' LIMIT ' . $limit
         );
+    }
+
+    /**
+     * Vitrin ürün listesi: arama, kategori ve fiyat filtresi, sıralama ve
+     * sayfalama (FR-002, FR-003, FR-004).
+     *
+     * - $search ürün adı, kısa açıklama, açıklama ve SKU içinde arar.
+     * - $categoryId seçilen kategoriyi ve doğrudan alt kategorilerini kapsar.
+     * - $minPrice / $maxPrice görüntülenen fiyat üzerinden süzer (KDV dahil, TRY).
+     * - $sort SORT_ORDERS anahtarlarından biridir; geçersizse varsayılan kullanılır.
+     *
+     * Her satır: id, category_id, name, slug, sku, short_description, price,
+     * unit_type, stock_quantity, is_featured, is_new, created_at, category_name,
+     * category_slug, image_path (ana görsel, yoksa null), variant_count,
+     * in_stock (0|1), display_price, old_price (indirim yoksa null).
+     *
+     * @return array{
+     *     items: list<array<string, mixed>>,
+     *     total: int,
+     *     page: int,
+     *     perPage: int,
+     *     totalPages: int
+     * }
+     */
+    public function paginateStorefront(
+        int $page = 1,
+        int $perPage = 12,
+        ?string $search = null,
+        ?int $categoryId = null,
+        ?float $minPrice = null,
+        ?float $maxPrice = null,
+        string $sort = self::DEFAULT_SORT
+    ): array {
+        $perPage = min(self::MAX_PER_PAGE, max(1, $perPage));
+        $order   = self::SORT_ORDERS[$sort] ?? self::SORT_ORDERS[self::DEFAULT_SORT];
+
+        // $innerWhere ve $outerWhere yalnızca bu metottaki sabit parçalardan oluşur;
+        // kullanıcı girdisi her zaman '?' parametresi olarak bağlanır.
+        $innerWhere  = self::STOREFRONT_WHERE;
+        $innerParams = [];
+
+        if ($search !== null && trim($search) !== '') {
+            $innerWhere .= " AND (p.name LIKE ? ESCAPE '!'"
+                . " OR p.short_description LIKE ? ESCAPE '!'"
+                . " OR p.description LIKE ? ESCAPE '!'"
+                . " OR p.sku LIKE ? ESCAPE '!')";
+
+            $like = '%' . $this->escapeLike(trim($search)) . '%';
+
+            array_push($innerParams, $like, $like, $like, $like);
+        }
+
+        if ($categoryId !== null && $categoryId > 0) {
+            $innerWhere   .= ' AND (p.category_id = ? OR c.parent_id = ?)';
+            $innerParams[] = $categoryId;
+            $innerParams[] = $categoryId;
+        }
+
+        $outerWhere  = '1 = 1';
+        $outerParams = [];
+
+        if ($minPrice !== null && $minPrice > 0) {
+            $outerWhere   .= ' AND x.display_price >= ?';
+            $outerParams[] = round($minPrice, 2);
+        }
+
+        if ($maxPrice !== null && $maxPrice > 0) {
+            $outerWhere   .= ' AND x.display_price <= ?';
+            $outerParams[] = round($maxPrice, 2);
+        }
+
+        $inner  = $this->storefrontListSql($innerWhere);
+        $params = array_merge($innerParams, $outerParams);
+
+        $total = (int) $this->fetchValue(
+            'SELECT COUNT(*) FROM (' . $inner . ') x WHERE ' . $outerWhere,
+            $params
+        );
+
+        $totalPages = max(1, (int) ceil($total / $perPage));
+        $page       = min(max(1, $page), $totalPages);
+        $offset     = ($page - 1) * $perPage;
+
+        // LIMIT ve OFFSET tamsayıya çevrilmiş değerlerdir, güvenle eklenir
+        $items = $this->fetchAll(
+            'SELECT x.* FROM (' . $inner . ') x'
+            . ' WHERE ' . $outerWhere
+            . ' ORDER BY ' . $order
+            . ' LIMIT ' . $perPage . ' OFFSET ' . $offset,
+            $params
+        );
+
+        return [
+            'items'      => $items,
+            'total'      => $total,
+            'page'       => $page,
+            'perPage'    => $perPage,
+            'totalPages' => $totalPages,
+        ];
     }
 
     /**
@@ -403,6 +530,31 @@ final class Product extends Model
     // -------------------------------------------------------------------------
     // Dahili yardımcılar
     // -------------------------------------------------------------------------
+
+    /**
+     * Vitrin listesinin iç sorgusunu üretir. $where yalnızca sabit parçalardan
+     * oluşur (kullanıcı girdisi '?' parametresidir). Sütunlar, kart için
+     * gerekenlerle sınırlıdır; uzun açıklama listeye taşınmaz.
+     */
+    private function storefrontListSql(string $where): string
+    {
+        return 'SELECT p.id, p.category_id, p.name, p.slug, p.sku, p.short_description,'
+            . ' p.price, p.unit_type, p.stock_quantity, p.is_featured, p.is_new, p.created_at,'
+            . ' c.name AS category_name, c.slug AS category_slug,'
+            . ' (SELECT i.image_path FROM product_images i WHERE i.product_id = p.id'
+            . '  ORDER BY i.is_main DESC, i.sort_order ASC, i.id ASC LIMIT 1) AS image_path,'
+            . ' (SELECT COUNT(*) FROM product_variants v WHERE v.product_id = p.id) AS variant_count,'
+            . ' (CASE WHEN EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id)'
+            . '  THEN EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id'
+            . '   AND v.is_active = 1 AND v.stock_quantity > 0)'
+            . '  ELSE p.stock_quantity > 0 END) AS in_stock,'
+            . ' COALESCE(' . self::SQL_VARIANT_MIN_PRICE . ', ' . self::SQL_PRODUCT_PRICE . ') AS display_price,'
+            . ' (CASE WHEN NOT EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id)'
+            . '  AND (' . self::SQL_PRODUCT_PRICE . ') < p.price THEN p.price ELSE NULL END) AS old_price'
+            . ' FROM products p'
+            . self::STOREFRONT_JOINS
+            . ' WHERE' . $where;
+    }
 
     /**
      * Fiyat kurallarını denetler: price > 0, discount_price < price,

@@ -1,0 +1,309 @@
+"md/ klasöründeki CLAUDE.md, DECISIONS.md ve PROJE-DURUMU.md dosyalarını oku.
+
+Migration dosyalarını oluşturma ve migration aşamasını geç.
+
+Mevcut migration yapısını esas alarak sıradaki uygulama modülünü başlat.
+
+sıradaki ilk dosya kodunu yaz
+
+Kurallar:
+- Her seferinde yalnızca bir dosya.
+- Önce kısa plan, sonra tam dosya içeriği(kodu yaz).
+- Her dosyadan sonra dur ve 'DEVAM' yazmamı bekle.
+- DECISIONS.md kurallarına uy.
+- PDO prepared statement, CSRF, XSS koruması ve PSR-12 kullan."
+
+Checking which cart files need changes next
+Kısa plan
+CLAUDE.md, DECISIONS.md ve PROJE-DURUMU.md’yi okudum. Migration aşaması geçildi. Sıradaki modül Sepet (karar 39-40). Durum dosyasındaki ilk açık madde Cart.php düzeltmesi, çünkü view ve route’tan önce bu gerekli.
+
+Dosya: app/Models/Cart.php
+Sorun: CartService (misafir sepeti) $this->cart->resolveSellable() ve assertQuantity() metotlarını çağırıyor, ama bunlar private. Bu haliyle misafirin sepete eklemesi Error: Call to private method ile çöker.
+Değişiklik: Yalnızca bu iki metot public yapılıyor ve docblock’ları buna göre güncelleniyor. İş mantığı, SQL ve kurallar aynı kalıyor.
+Şema değişikliği: Yok.
+Gereksinimler: FR-040, FR-041, FR-042, FR-044.
+Güvenlik kontrolü: Tüm sorgular prepared statement. Model içinde $_GET, $_POST veya $_SESSION yok. CSRF ve XSS bu katmanda geçerli değil.
+Dosya: app/Models/Cart.php
+
+Kontroller ve notlar
+Kontrol: php -l app/Models/Cart.php
+Davranış farkı: Yok, yalnızca erişim düzeyi değişti. Ek olarak resolveSellable() içindeki iki ayrı new ProductVariant() çağrısı tek örneğe indirildi.
+PROJE-DURUMU.md: Şu satır [x] yapılabilir: “Cart.php içinde resolveSellable() ve assertQuantity() public yapılmalı”.
+Sonraki dosya (DEVAM ile): app/Controllers/CartController.php. Validator | ile böldüğü için regex kuralı dizi biçimine çevrilecek. Şu an update() ve remove() KEY_PATTERN yüzünden her istekte doğrulama hatası verir.
+Ardından: cart/index view ve JS, sonra App.php içindeki /sepet* route’ları.
+
+DEVAM yazarsan sıradaki dosyaya geçeceğim.
+
+devam
+
+Kısa plan
+Dosya: app/Controllers/CartController.php
+Sorun: update() ve remove() içindeki kural 'required|string|max:25|regex:' . KEY_PATTERN biçiminde yazılmıştı. KEY_PATTERN içinde | var (p5v3 veya 5 seçeneği). Validator metin kuralını | ile böldüğü için desen ikiye ayrılıyor. Sonuç: geçersiz regex, InvalidArgumentException, yani her güncelleme ve silme isteği 500 verir.
+Çözüm: key kuralı dizi biçimine çevrildi. Validator::parseRules() dizideki öğeleri bölmeden okur ve regex parametresini ham bırakır. Başka bir şey değişmedi.
+Şema değişikliği: Yok.
+Gereksinimler: FR-040, FR-042, FR-043, FR-044, FR-045, NFR-003, NFR-004.
+Güvenlik kontrolü:
+CSRF: App::handle() içinde yapılıyor, Fetch için X-CSRF-TOKEN başlığı geçerli.
+XSS: yanıtlar JSON, Response::json JSON_HEX_* bayrakları kullanıyor, HTML çıktısı view’da kaçırılacak.
+SQL: controller’da sorgu yok, model katmanı prepared statement kullanıyor.
+Dosya: app/Controllers/CartController.php
+
+Kontroller ve notlar
+Kontrol: php -l app/Controllers/CartController.php
+Elle test (migration 011 uygulandıktan sonra):
+key=p5v3 veya key=12 ile /sepet/guncelle artık 500 vermemeli.
+key=abc ile 422 (“Sepet kalemi biçimi geçersiz.”) dönmeli.
+Başlıksız POST 419 olmalı.
+Değişen tek mantık: keyRules() yardımcısı. update() ve remove() bunu kullanıyor.
+PROJE-DURUMU.md: “CartController: update() ve remove() içindeki regex kuralı dizi biçimine çevrilmeli” maddesi [x] yapılabilir.
+Artık gereksiz: CartService::GUEST_KEY_PATTERN sabiti kullanılmıyor (Orta riskler listesinde). Sonraki bir görevde silinebilir.
+Sıradaki dosya: app/Views/cart/index.php (sepet sayfası ve Fetch JS). Ardından App.php içine CartController use satırı ve 5 /sepet* route’u.
+
+DEVAM yazarsan sıradaki dosyaya geçeceğim.
+
+devam
+
+Kısa plan
+Dosya: app/Views/cart/index.php
+Amaç: CartController::index() tarafından layouts/main içine render edilen sepet sayfası. Sayfa sunucuda çizilir. Adet artırma/azaltma, adet yazma ve kalem çıkarma Fetch API ile sayfa yenilenmeden yapılır.
+Veri: $items (key, product_id, name, variant_name, sku, slug, quantity, unit_price, total_price, stock, available), $subtotal, $quantity.
+Uç noktalar: POST /sepet/guncelle ve POST /sepet/sil (JSON gövde, X-CSRF-TOKEN başlığı, token layouts/main içindeki csrf-token meta etiketinden okunur).
+Kararlar:
+Ana layout’ta showToast yok. Bildirimler sayfa içindeki Bootstrap alert alanına textContent ile yazılır (XSS güvenli).
+İşlem sırasında satırdaki butonlar devre dışı kalır (loading state). Hatada sunucunun döndürdüğü adet geri yazılır.
+Stoğu yetmeyen veya satıştan kalkan kalem uyarı alır. Böyle bir kalem varken “Ödemeye Geç” butonu kilitli kalır.
+Ödeme sayfası henüz yok. Buton şimdilik devre dışı bir button; checkout modülünde bağlantıya çevrilecek.
+Ürün bağlantısı /urun/{slug} biçimindedir. Vitrin modülü yazılana kadar bu bağlantı 404 verir.
+Şema değişikliği: Yok.
+Gereksinimler: FR-042, FR-043, FR-044, FR-045, NFR-003, NFR-005.
+Güvenlik kontrolü: Tüm PHP çıktıları $this->e() ile kaçırılıyor. JS dinamik metni yalnızca textContent ile yazıyor. POST’lar CSRF başlığı taşıyor. View içinde SQL yok.
+Dosya: app/Views/cart/index.php
+
+Kontroller ve notlar
+Kontrol: php -l app/Views/cart/index.php
+XSS: Tüm dinamik PHP değerleri $this->e() ile basılıyor. $money çıktısı da kaçırılıyor. JS yalnızca textContent, value ve className kullanıyor.
+CSRF: Fetch isteklerinde X-CSRF-TOKEN başlığı var. Başlık layouts/main içindeki csrf-token meta etiketinden gelir.
+Elle test (route’lar ve migration 011 sonrası):
++/− adedi değiştirir, satır toplamı ve ara toplam sayfa yenilenmeden güncellenir.
+Stoktan fazla adet yazınca kırmızı hata görünür ve adet sunucudaki gerçek değere döner.
+“Çıkar” son kalemi silince “Sepetiniz boş” kutusu görünür.
+Satıştan kalkmış ürün varsa uyarı çıkar ve sağdaki uyarı kutusu açılır.
+Bilinen sınırlar:
+Hata sonrası senkronizasyon data-update-url içindeki guncelle ekini ozet yapar. Bu /sepet/guncelle → /sepet/ozet ile uyumlu, route adları değişirse buraya da dokunmak gerekir.
+Ana layout’ta henüz “Sepet” menü bağlantısı ve rozeti yok. Ayrı küçük bir görev olarak layouts/main.php’ye eklenecek.
+PROJE-DURUMU.md: “cart/index view’ı, sepet JS’i ve /sepet* route’ları” maddesinin view/JS kısmı tamamlandı. Route’lar bekliyor.
+Sıradaki dosya: app/Core/App.php. CartController için use satırı ve admin grubunun dışına 5 route eklenecek: GET /sepet, GET /sepet/ozet, POST /sepet/ekle, POST /sepet/guncelle, POST /sepet/sil.
+
+DEVAM yazarsan sıradaki dosyaya geçeceğim.
+
+devam
+
+Kısa plan
+Dosya: app/Core/App.php
+Değişiklik: İki ekleme, başka hiçbir şey değişmiyor.
+use App\Controllers\CartController; satırı.
+registerRoutes() içine, admin grubunun dışına 5 sepet route’u:
+GET /sepet → index
+GET /sepet/ozet → summary
+POST /sepet/ekle → add
+POST /sepet/guncelle → update
+POST /sepet/sil → remove
+Güvenlik: Route’lar AdminMiddleware dışında, çünkü misafir de sepet kullanır. CSRF doğrulaması handle() içinde tüm POST’lara zaten uygulanıyor, ek bir muafiyet eklenmedi.
+Ek not: use satırlarını alfabetik düzene soktum (HomeController ile StockController yerleri değişti). Davranış etkisi yok.
+Şema değişikliği: Yok.
+Gereksinimler: FR-040, FR-042, FR-043, FR-044, FR-045, NFR-003.
+Dosya: app/Core/App.php
+
+Kontroller ve notlar
+Kontrol: php -l app/Core/App.php
+Elle test:
+GET /sepet boş sepet kutusunu göstermeli.
+GET /sepet/ozet JSON dönmeli: {"success":true,"count":0,...}.
+POST /sepet/ekle CSRF başlığı olmadan → 419 (JSON).
+/admin hâlâ girişsiz /admin/giris’e yönlendirmeli (admin grubu etkilenmedi).
+Bilinen sınırlar:
+Sepeti çalıştırmak için ürün detay sayfası (“Sepete ekle” butonu) gerekiyor; şimdilik yalnızca Fetch/konsol ile eklenebilir.
+Migration 011 uygulanmadan üye sepeti çalışmaz; misafir sepeti yalnızca session kullandığı için çalışır, ama ürün/varyant sorguları için 001–009 tabloları gerekir.
+PROJE-DURUMU.md: /sepet* route’ları maddesi tamamlandı. Ayrıca “CartService::GUEST_KEY_PATTERN kullanılmıyor” notu hâlâ açık.
+Sıradaki dosya: Ürün vitrini. Önce app/Controllers/ProductController.php (ürün listeleme + /urun/{slug} detay), ardından view’lar ve route’lar. Bu aşama için Product modeline vitrin listeleme metodu (arama, kategori ve fiyat filtresi, sayfalama) eklemek gerekecek; önce o şema/model etkisini raporlayacağım.
+
+DEVAM yazarsan sıradaki dosyaya geçeceğim.
+
+devam
+
+Kısa plan
+Dosya: app/Models/Product.php
+Neden bu dosya: Vitrin controller’ı (liste ve /urun/{slug}) yazılmadan önce modelin liste sorgusu gerekiyor. Mevcut modelde yalnızca findBySlug ve getFeatured var, arama, filtre ve sayfalama yok. Bunu önceki adımda raporlamıştım.
+Değişiklik: Yalnızca ekleme. Yeni paginateStorefront() metodu ve SORTS sabiti geliyor, mevcut metotlar aynen korunuyor.
+paginateStorefront() özellikleri:
+Arama: ürün adı, kısa açıklama, açıklama ve SKU (FR-003).
+Kategori filtresi: seçilen kategori ve doğrudan alt kategorileri.
+Fiyat aralığı: görüntülenen fiyat üzerinden. İndirim tarih aralığı içindeyse indirimli fiyat, varyantlı üründe en ucuz aktif varyant fiyatı (FR-002).
+Sıralama: yalnızca beyaz listeden (new, price_asc, price_desc, name).
+Sayfalama (FR-004).
+Her satırda kart için gereken alanlar gelir: ana görsel yolu, display_price, old_price (indirim varsa), has_variants, in_stock. Böylece “Tükendi” gösterimi yapılabilir (FR-005, FR-006).
+Vitrin görünürlüğü mevcut STOREFRONT_JOINS ve STOREFRONT_WHERE ile sağlanır (FR-033).
+Şema değişikliği: Yok.
+Güvenlik kontrolü: Tüm kullanıcı girdisi ? parametresi olarak bağlanıyor, LIKE özel karakterleri kaçırılıyor. SQL’e yalnızca sabit parçalar ve tamsayıya çevrilmiş LIMIT/OFFSET ekleniyor. Sıralama kullanıcıdan gelen metinle değil, sabit eşleme tablosuyla seçiliyor. Model içinde $_GET/$_POST yok.
+Gereksinimler: FR-002, FR-003, FR-004, FR-005, FR-006, FR-033.
+Dosya: app/Models/Product.php
+
+Kontroller ve notlar
+Kontrol: php -l app/Models/Product.php
+Sözleşme: Controller $sort değerini Product::DEFAULT_SORT ile eşleştirip geçirecek. Geçersiz değer modelde varsayılana düşer.
+Elle test (ürün ve kategori verisiyle):
+Arama ad, açıklama ve SKU’da çalışmalı. % ve _ içeren arama metni joker gibi davranmamalı.
+Kategori filtresi alt kategorideki ürünleri de getirmeli.
+Varyantlı üründe display_price en ucuz aktif varyant fiyatı olmalı.
+İndirim bitiş tarihi geçmişse old_price boş, display_price normal fiyat olmalı.
+Stok 0 olan ürünün in_stock değeri 0 olmalı.
+Pasif kategori veya marka ürünleri listede görünmemeli.
+Bilinen sınırlar:
+Kategori filtresi yalnızca bir seviye alt kategoriyi kapsar. Daha derin ağaç gerekirse ayrı görevde genişletilir.
+Açıklama araması LIKE '%...%' olduğu için büyük kataloglarda yavaşlayabilir. İleride FULLTEXT indeksi ayrı migration olarak değerlendirilebilir.
+Alt sorgular STOREFRONT_JOINS içindeki c ve b takma adlarına bağlı. Bunlar değişirse buradaki SQL de güncellenmeli.
+PROJE-DURUMU.md: Product satırına paginateStorefront eklenmeli. Sıradaki dosya listesi güncellenmeli.
+Sıradaki dosya: app/Controllers/ProductController.php (vitrin). GET /urunler için girdi doğrulaması (arama, kategori, fiyat aralığı, sıralama, sayfa) ve GET /urun/{slug} için ürün, varyant ve görsel verisinin hazırlanması. Ardından view’lar ve route’lar gelecek.
+
+DEVAM yazarsan sıradaki dosyaya geçeceğim.
+
+devam
+
+Kısa plan
+Dosya: app/Controllers/ProductController.php (vitrin, App\Controllers ad alanı). Admin tarafındaki App\Controllers\Admin\ProductController ile karışmaz.
+Uç noktalar:
+GET /urunler: arama (q), kategori (kategori), fiyat aralığı (min, max), sıralama (sirala), sayfa (page).
+GET /urun/{slug}: ürün detayı, galeri, aktif varyantlar, fiyat ve stok bilgisi, benzer ürünler.
+Kararlar:
+Tüm girdiler Validator’dan geçer. Geçersiz filtre yok sayılır ve kullanıcıya uyarı olarak gösterilir, sayfa yine açılır. min > max ise ikisi de yok sayılır.
+Slug biçimi doğrulanır. Geçersiz veya bulunamayan slug için 404 döner. Product::findBySlug() vitrin görünürlüğünü zaten uygular (FR-033).
+Varyantlı üründe fiyat ve stok varyant bazlı hazırlanır. Satın alınabilirlik, aktiflik ve stoktan hesaplanır (FR-022, FR-025).
+Görüntülenme sayacı ürün sayfası açılınca artar.
+404 için App::errorResponse() private olduğundan controller kendi küçük, kaçırılmış 404 sayfasını üretir.
+Şema değişikliği: Yok.
+Gereksinimler: FR-001 (kısmen), FR-002, FR-003, FR-004, FR-005, FR-006, FR-014, FR-015, FR-022, FR-033.
+Güvenlik kontrolü:
+Her iki route yalnızca GET olduğu için CSRF gerekmiyor.
+Controller’da SQL yok. Model prepared statement kullanıyor.
+Çıktı kaçırma view’lardadır. 404 HTML’i htmlspecialchars ile üretiliyor.
+Dosya: app/Controllers/ProductController.php
+
+Kontroller ve notlar
+Kontrol: php -l app/Controllers/ProductController.php
+View sözleşmesi:
+products/index alır: result (items, total, page, perPage, totalPages), search, categoryId, minPrice, maxPrice, sort, sorts, categories (ağaç, children ile), filterErrors.
+products/show alır: product, images, variants (id, name, sku, price, old_price, stock, purchasable), hasVariants, currentPrice, oldPrice, availableStock, category, parentCategory, brand, related.
+Route adı çakışması: App.php içinde admin ProductController zaten use ile içe aktarılıyor. Vitrin sınıfı için use App\Controllers\ProductController as StorefrontProductController; takma adı kullanılacak.
+Bilinen sınırlar:
+view_count her GET’te artar, bot ve yenileme trafiği de sayılır. Gerekirse sonradan oturum başına tek sayım eklenir.
+Kategori filtresi yalnızca bir seviye alt kategoriyi kapsıyor (modeldeki sınır).
+?min=850,50 gibi virgüllü fiyat Validator decimal kuralıyla reddedilir ve uyarı olarak görünür (DECISIONS.md: ondalık ayırıcı nokta).
+Elle test (view ve route sonrası):
+/urun/olmayan-slug ve /urun/Gecersiz_Slug! → 404.
+Pasif ürün veya pasif kategorideki ürün → 404.
+?sirala=drop → uyarı yok, varsayılan sıralama (in kuralı hatası uyarı olarak görünür).
+PROJE-DURUMU.md: “Ürün listeleme ve ürün detay sayfası” maddesi başladı (model ve controller tamam, view ve route bekliyor).
+Sıradaki dosya: app/Views/products/index.php (kart ızgarası, filtre formu, sayfalama, “Sepete Ekle” ve “Tükendi” gösterimi). Ardından products/show.php (galeri, varyant seçimi, Fetch ile sepete ekleme) ve App.php route’ları.
+
+DEVAM yazarsan sıradaki dosyaya geçeceğim.
+
+app/Controllers/Admin/ProductController.php son çıktının dosya yolu bu mu? yoksa yeni bir dosya mı bu=>app/Controllers/ProductController.php bu adresteki?
+
+Yeni bir dosya. Son çıktıdaki yol app/Controllers/ProductController.php (başında Admin/ yok), yani vitrin (müşteri tarafı) controller’ı. app/Controllers/Admin/ProductController.php ise zaten var olan admin panelindeki ürün controller’ı; ona dokunmadım.
+
+Dosya	Ad alanı	Görevi
+app/Controllers/Admin/ProductController.php	App\Controllers\Admin	Admin: ürün ekle, düzenle, sil (mevcut, değişmedi)
+app/Controllers/ProductController.php	App\Controllers	Vitrin: /urunler listesi ve /urun/{slug} detay (yeni)
+
+İki sınıfın adı aynı (ProductController) ama ad alanları farklı olduğu için çakışmazlar. CLAUDE.md klasör yapısında da bu ayrım zaten öngörülmüş: Controllers/ProductController.php ve Controllers/Admin/ProductController.php.
+
+App.php’ye route eklerken tek dikkat noktası şu: admin sınıfı zaten use App\Controllers\Admin\ProductController; ile içe aktarılıyor. Vitrin sınıfı için takma ad kullanacağız:
+
+php
+use App\Controllers\ProductController as StorefrontProductController;
+
+Bu işi App.php adımında yapacağım. Önce sıradaki app/Views/products/index.php dosyasına geçmem için DEVAM yazabilirsin.
+
+devam
+
+Kısa plan
+Dosya: app/Views/products/index.php (layouts/main içine yerleşir)
+İçerik: başlık ve sonuç sayısı, filtre formu (arama, kategori, fiyat aralığı, sıralama), uyarı kutusu (filterErrors), ürün kartı ızgarası, sayfalama.
+Izgara: mobilde tek kolon, tabletde iki, masaüstünde üç-dört (row-cols-1 row-cols-sm-2 row-cols-lg-3 row-cols-xl-4).
+Kart (FR-005, FR-006): görsel (yoksa yer tutucu), ad, kategori, fiyat, indirim varsa üstü çizili eski fiyat ve indirim oranı rozeti, stok durumu.
+Varyantlı üründe fiyatın önünde “başlayan” ifadesi ve buton “Seçenekleri Gör” olur (/urun/{slug}), çünkü varyant seçimi zorunlu.
+Varyantsız ve stokta olan üründe “Sepete Ekle” butonu Fetch ile POST /sepet/ekle yapar.
+Stokta olmayan üründe buton yerine “Tükendi” rozeti gösterilir.
+JS: buton işlem sırasında devre dışı kalır, sonuç sayfa içi alert alanına textContent ile yazılır, CSRF X-CSRF-TOKEN başlığıyla csrf-token meta etiketinden gider.
+Güvenlik: tüm PHP çıktıları $this->e() ile kaçırılıyor, sayfa bağlantıları http_build_query ile üretiliyor, JS yalnızca textContent kullanıyor.
+Şema değişikliği: yok. Gereksinimler: FR-002, FR-003, FR-004, FR-005, FR-006, FR-043, NFR-005.
+Dosya: app/Views/products/index.php
+
+Kontroller ve notlar
+Kontrol: php -l app/Views/products/index.php
+XSS: tüm dinamik değerler $this->e() ile basılıyor. JS’e giden URL json_encode ve JSON_HEX_* bayraklarıyla veriliyor.
+Davranış:
+Arama, kategori, fiyat ve sıralama sayfalamada korunur.
+Varyantlı ürün “Başlayan fiyat” ve “Seçenekleri Gör” gösterir, tükenmiş ürün “Tükendi” rozeti alır.
+“Sepete Ekle” sayfayı yenilemez, sonuç üstteki uyarı alanında görünür.
+Bilinen sınırlar:
+Ana layout’ta henüz “Ürünler” ve “Sepet” menü bağlantısı ve sepet rozeti yok. Kullanıcı sepete /sepet adresinden gider. Ayrı küçük bir layouts/main.php görevi olarak eklenecek.
+Kategori seçeneklerinde yalnızca iki seviye (ana ve alt) gösteriliyor, modeldeki filtre sınırıyla uyumlu.
+Elle test: ?q=100%25 joker gibi davranmamalı, ?min=abc uyarı vermeli, ?sirala=x uyarı vermeli, tükenmiş üründe buton olmamalı.
+Sıradaki dosya: app/Views/products/show.php (galeri, varyant seçimi, fiyat ve stok anlık güncelleme, miktar ve Fetch ile sepete ekleme, benzer ürünler). Sonra App.php içine /urunler ve /urun/{slug} route’ları.
+
+DEVAM yazarsan sıradaki dosyaya geçeceğim.
+
+devam
+
+Kısa plan
+Dosya: app/Views/products/show.php (layouts/main içine yerleşir)
+İçerik: breadcrumb (kategori, ürün), galeri (ana görsel + küçük resimler), başlık, marka, fiyat ve stok alanı, varyant seçimi, adet ve “Sepete Ekle”, ürün ve gıda bilgileri (menşe, üretici, raf ömrü, saklama koşulu, alerjen, içindekiler), benzer ürünler.
+Varyant (FR-022, FR-025): varyantlı üründe seçim yapılmadan buton kilitli. Seçilen varyantın fiyatı, eski fiyatı ve stok durumu sayfa yenilenmeden güncellenir. Stoksuz varyant seçilemez (devre dışı). Varyant verisi JS’e json_encode ile güvenli gömülür.
+Sepete ekleme: Fetch ile POST /sepet/ekle (product_id, variant_id, quantity), adet stokla sınırlanır, işlem sırasında buton devre dışı, sonuç alert alanına textContent ile yazılır.
+Galeri: küçük resme tıklayınca ana görsel değişir (src ve alt atanır).
+Güvenlik: tüm PHP çıktıları $this->e(), JS dinamik metinde textContent. Açıklama metni kaçırılır, satır sonları nl2br ile e() sonrası uygulanır.
+Şema değişikliği: yok. Gereksinimler: FR-014, FR-015, FR-022, FR-025, FR-043, FR-044, NFR-005.
+Dosya: app/Views/products/show.php
+
+Kontroller ve notlar
+Kontrol: php -l app/Views/products/show.php
+XSS: tüm dinamik değerler $this->e() ile basılıyor. Çok satırlı metinde önce kaçırma, sonra nl2br uygulanıyor. Varyant verisi JSON_HEX_* bayraklarıyla gömülüyor.
+Elle test:
+Varyantlı üründe seçim yapmadan buton kilitli, seçince fiyat ve stok değişmeli.
+Stoksuz varyant seçilemez, “(Tükendi)” etiketli.
+Küçük resme tıklayınca ana görsel değişmeli.
+Adet stoktan fazlaysa istemci uyarısı, sunucuda da 422 mesajı görünmeli.
+Bilinen sınırlar:
+Varyantsız ürünün stoğu 1000'den fazlaysa adet üst sınırı 1000 olur (sepet kuralıyla uyumlu).
+Ana layout’ta hâlâ “Ürünler” ve “Sepet” menü bağlantısı yok.
+Sıradaki dosya: app/Core/App.php: StorefrontProductController takma adı ve iki route (GET /urunler, GET /urun/{slug}). Slug için kısıt {slug:[a-z0-9-]+} kullanılacak.
+
+DEVAM yazarsan sıradaki dosyaya geçeceğim.
+
+devam
+
+Kısa plan
+Dosya: app/Core/App.php
+Değişiklik: İki ekleme, başka hiçbir şey değişmiyor.
+use App\Controllers\ProductController as StorefrontProductController; (admin ProductController ile çakışmasın diye takma ad).
+Vitrin bölümüne iki route: GET /urunler → index, GET /urun/{slug:[a-z0-9]+(?:-[a-z0-9]+)*} → show.
+Slug kısıtı: Router {ad:kısıt} içinde } kabul etmiyor, ama (?:...) ve + sorun değil. Kısıtta | ve } yok, güvenli. Kısıtlı desen, controller’daki SLUG_PATTERN ile aynı; uyuşmayan yol zaten 404 olur.
+Güvenlik: İki route da yalnızca GET, AdminMiddleware dışında (herkese açık vitrin). CSRF gerekmiyor.
+Şema değişikliği: Yok.
+Gereksinimler: FR-002, FR-003, FR-004, FR-014, FR-015, FR-033.
+Dosya: app/Core/App.php
+
+Kontroller ve notlar
+Kontrol: php -l app/Core/App.php
+Önemli: Router’ın compile() fonksiyonu kısıtı (?P<slug>...) içine koyar ve deseni # ayraçlı regex yapar. Kısıttaki (?:...) bu yapıyla uyumludur. Ancak compile() ayırıcı deseni [^}]+ kullandığı için kısıtta } bulunmamalı; burada yok.
+Elle test:
+/urunler liste, /urun/antep-fistigi detay açılmalı.
+/urun/Gecersiz_Slug route eşleşmediği için genel 404 sayfası dönmeli (vitrin 404'ü değil, App 404'ü).
+/admin/urunler hâlâ admin listesini açmalı (vitrin /urunler ile çakışmaz, admin yolu /admin önekli).
+Bilinen sınır: layouts/main.php’de “Ürünler” ve “Sepet” menü bağlantısı ve sepet rozeti hâlâ yok; ziyaretçi bu sayfalara adresten ulaşır.
+PROJE-DURUMU.md: Vitrin ürün listesi ve detay (model, controller, 2 view, 2 route) tamamlandı. Test komutlarına php -l satırları eklenmeli: app/Controllers/ProductController.php, app/Views/products/index.php, app/Views/products/show.php, app/Views/cart/index.php.
+Sıradaki dosya: app/Views/layouts/main.php: menüye “Ürünler” ve “Sepet” bağlantısı, /sepet/ozet ile güncellenen sepet rozeti. Bundan sonra müşteri kayıt/giriş modülü başlayacak (girişte CartService::mergeGuestCart() çağrılacak).
+
+DEVAM yazarsan sıradaki dosyaya geçeceğim.
+

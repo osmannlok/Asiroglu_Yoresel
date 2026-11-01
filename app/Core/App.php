@@ -18,8 +18,10 @@ use App\Controllers\Admin\DashboardController;
 use App\Controllers\Admin\ProductController;
 use App\Controllers\Admin\ProductImageController;
 use App\Controllers\Admin\ProductVariantController;
-use App\Controllers\HomeController;
 use App\Controllers\Admin\StockController;
+use App\Controllers\CartController;
+use App\Controllers\HomeController;
+use App\Controllers\ProductController as StorefrontProductController;
 use App\Middleware\AdminMiddleware;
 use Throwable;
 
@@ -92,6 +94,20 @@ final class App
         // --- Vitrin ---------------------------------------------------------
         $this->router->get('/', [HomeController::class, 'index']);
 
+        // Ürün listesi ve detay (FR-002, FR-003, FR-004, FR-014, FR-015, FR-033).
+        // Herkese açıktır; yalnızca GET olduğu için CSRF gerekmez.
+        $this->router->get('/urunler', [StorefrontProductController::class, 'index']);
+        $this->router->get('/urun/{slug:[a-z0-9]+(?:-[a-z0-9]+)*}', [StorefrontProductController::class, 'show']);
+
+        // --- Sepet (FR-040, FR-042, FR-043, FR-044, FR-045) -----------------
+        // Misafir de sepet kullanır; bu route'lar AdminMiddleware dışındadır.
+        // POST'ların CSRF doğrulaması handle() içinde yapılır (X-CSRF-TOKEN).
+        $this->router->get('/sepet', [CartController::class, 'index']);
+        $this->router->get('/sepet/ozet', [CartController::class, 'summary']);
+        $this->router->post('/sepet/ekle', [CartController::class, 'add']);
+        $this->router->post('/sepet/guncelle', [CartController::class, 'update']);
+        $this->router->post('/sepet/sil', [CartController::class, 'remove']);
+
         // --- Yönetim paneli: giriş ve çıkış ---------------------------------
         // Bu route'lar AdminMiddleware grubunun DIŞINDA kalmalıdır; aksi halde
         // giriş sayfası giriş yapmamış kullanıcıyı kendisine yönlendirir.
@@ -100,7 +116,7 @@ final class App
         $this->router->post('/admin/cikis', [AdminAuthController::class, 'logout']);
 
         // --- Yönetim paneli: korumalı route'lar -----------------------------
-        // Yeni admin route'ları (stok, sipariş vb.) bu grubun İÇİNE eklenir.
+        // Yeni admin route'ları (sipariş vb.) bu grubun İÇİNE eklenir.
         // Grup içindeki yollar "/admin" önekiyle birleşir ('/' => '/admin').
         $this->router->group(
             ['prefix' => '/admin', 'middleware' => [AdminMiddleware::class]],

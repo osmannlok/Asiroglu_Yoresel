@@ -221,7 +221,9 @@ Planlanan 31 uygulama tablosu:
 
 - `carts` yalnızca giriş yapmış kullanıcılar içindir; `carts.user_id` NOT NULL'dır. `carts.session_id` rezerve alandır, kullanılmaz.
 - Giriş yapınca session sepeti kullanıcının DB sepetiyle transaction içinde birleştirilir (aynı ürün+varyantta adetler toplanır, stok sınırı aşılmaz).
-- Misafir sepeti yalnızca PHP session'da tutulur; veritabanında carts/cart_items kaydı açılmaz (bkz. DECISIONS.md MİSAFİR SEPETİ).
+Misafir sepeti yalnızca PHP session'da tutulur (`$_SESSION['cart']['items']`).
+`carts` ve `cart_items` tabloları yalnızca üye sepeti içindir; `carts.user_id` NOT NULL'dır.
+Giriş yapıldığında misafir sepeti `CartService::mergeGuestCart()` ile üye sepetine birleştirilir.
 - `cart_items.variant_key` VIRTUAL generated column'dur: `IFNULL(product_variant_id, 0)`. UNIQUE index: `uq_cart_item_product (cart_id, product_id, variant_key)`.
 - Sepet işlemleri Fetch API ile AJAX üzerinden yapılacak.
 - Sepete ekleme, adet güncelleme ve ürün silme işlemlerinde stok kontrolü yapılacak.

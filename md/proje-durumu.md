@@ -55,11 +55,17 @@
 - [x] `ProductController` ve `ProductVariantController`: başlangıç stoğu > 0 ise `stock_movements` kaydı (aynı transaction)
 - [x] Kategori görseli (`CategoryController`, `admin/categories/form.php`) ve marka logosu (`BrandController`, `admin/brands/form.php`) eklendi
 - [x] Sepet modülü başladı: `Models/Cart.php`, `Services/CartService.php`, `Controllers/CartController.php` yazıldı
-- [ ] `Cart.php` içinde `resolveSellable()` ve `assertQuantity()` `public` yapılmalı (CartService kullanıyor)
-- [ ] `CartController`: `update()` ve `remove()` içindeki `regex` kuralı dizi biçimine çevrilmeli (desen `|` içeriyor)
 - [ ] `cart/index` view'ı, sepet JS'i ve `/sepet*` route'ları (`App.php`) yazılacak
 - [ ] Migration 011'in `migrate.php` ile gerçek MySQL'de çalıştırılması
-
+- [x] `Cart.php`: `resolveSellable()` ve `assertQuantity()` `public` yapıldı; `resolveSellable()` içindeki tekrarlanan `ProductVariant` örneği tekilleştirildi.
+- [x] `CartController`: `update()` ve `remove()` içindeki `KEY_PATTERN` regex kuralı dizi biçimine çevrildi; `keyRules()` yardımcısı eklendi.
+- [x] `app/Views/cart/index.php` yazıldı: sepet listesi, adet güncelleme, kalem silme, stok/satış durumu uyarıları ve Fetch JS.
+- [x] `App.php`: `CartController` için `use` satırı ve 5 sepet route'u eklendi: `GET /sepet`, `GET /sepet/ozet`, `POST /sepet/ekle`, `POST /sepet/guncelle`, `POST /sepet/sil`.
+- [x] `Product.php`: vitrin için `paginateStorefront()` ve `SORTS` eklendi; arama, kategori, fiyat aralığı, sıralama ve sayfalama desteği geldi.
+- [x] Vitrin `ProductController` yazıldı: `GET /urunler` ve `GET /urun/{slug}`; admin `Admin\ProductController` değişmedi.
+- [x] `app/Views/products/index.php` yazıldı: filtre formu, ürün kartları, sayfalama, Fetch ile sepete ekleme ve “Tükendi” durumu.
+- [x] `app/Views/products/show.php` yazıldı: galeri, varyant seçimi, dinamik fiyat/stok güncelleme, miktar seçimi, Fetch ile sepete ekleme ve benzer ürünler.
+- [x] `App.php`: `use App\Controllers\ProductController as StorefrontProductController;` ve vitrin route'ları eklendi: `GET /urunler`, `GET /urun/{slug:[a-z0-9]+(?:-[a-z0-9]+)*}`.
 
 ## 3. Oluşturulan Migration Dosyaları
 
@@ -112,16 +118,21 @@ Toplam: 18 migration dosyası, 31 uygulama tablosu (schema_migrations hariç).
 - `Cart`: yalnızca üye sepeti (`carts`, `cart_items`); `findActiveByUser`, `getOrCreateActive`, `getItems`, `countQuantity`, `addItem` (aynı ürün+varyantta adet artar, transaction + `FOR UPDATE`), `setQuantity` (0 siler), `removeItem`, `clear`, `getTotals`; `create/update/delete` kapalı; stok, varyant ve vitrin görünürlüğü kontrolü `resolveSellable()` içinde
 - `Services\CartService`: misafir (`$_SESSION['cart']['items']`) ve üye sepetini tek arayüzde toplar; `summary`, `count`, `items`, `add`, `setQuantity`, `remove`, `mergeGuestCart` (giriş sonrası birleştirme; sığmayan kalem uyarı olarak döner)
 - `CartController`: `index`, `summary`, `add`, `update`, `remove` (JSON, Fetch); servis hataları 422 ile döner
-
+- `Product`: vitrin için `paginateStorefront()` ve `SORTS` eklendi. Arama ürün adı, kısa açıklama, açıklama ve SKU üzerinden yapılır; kategori filtresi seçilen kategori ile doğrudan alt kategorileri kapsar. Sıralama beyaz listeyle sınırlıdır: `new`, `price_asc`, `price_desc`, `name`.
+- `ProductController` (vitrin, `App\Controllers`): `index` ve `show`; `/urunler` filtreleri doğrular, `/urun/{slug}` ürün detayını, varyantları, görselleri ve benzer ürünleri hazırlar. `view_count` her detay görüntülemesinde artar.
+- `Views/products/index`: filtre formu, ürün kartı ızgarası, sayfalama, Fetch ile sepete ekleme.
+- `Views/products/show`: galeri, varyant seçimi, dinamik fiyat/stok, adet ve Fetch ile sepete ekleme.
+- `Views/cart/index`: sepet sayfası; Fetch ile adet güncelleme, kalem silme ve `/sepet/ozet` senkronizasyonu.
 
 ## 5. Sıradaki Dosya
 
-1. `app/Views/cart/index.php` ve sepet JS'i
-2. `App.php`: `CartController` `use` satırı ve 5 `/sepet*` route'u (admin grubunun dışında)
-3. Ürün listeleme ve ürün detay sayfası (vitrin, "Sepete ekle" butonu, varyant seçimi)
-4. Müşteri kayıt/giriş (girişte `CartService::mergeGuestCart()` çağrılacak)
-5. Doğrulama turu: `php -l` (tümü) ve elle test
-6. Sipariş modülü
+
+1. `app/Views/layouts/main.php`: menüye “Ürünler” ve “Sepet” bağlantıları, `/sepet/ozet` ile güncellenen sepet rozeti.
+2. `CartService::GUEST_KEY_PATTERN` kullanılmayan sabitinin silinmesi.
+3. Migration 011’in `migrate.php` ile gerçek MySQL’de çalıştırılması ve sepetin elle test edilmesi.
+4. Müşteri kayıt/giriş modülü; giriş sonrası `CartService::mergeGuestCart()` çağrılacak.
+5. Doğrulama turu: tüm yeni dosyalar için `php -l`, ardından tarayıcı/veritabanı testleri.
+6. Sipariş modülü.
 
 ## 6. Bekleyen Migration Dosyaları
 
@@ -140,7 +151,9 @@ Bekleyen migration yazımı yok (001–018 yazıldı). Bekleyen iş: 010–018'i
 8. **`Request::ip()`:** Şu aşamada değiştirilmez. Proxy veya Cloudflare arkasına geçildiğinde güvenilir proxy başlıkları ile IP tespiti yeniden değerlendirilir.
 9. **Ayrı görevler:** Güvenlik başlıkları, SRI ve 405 yanıtı düzeltmesi ayrı görevlerde yapılır.
 10. **Migration sırası:** 001–018 sırası Bölüm 3'teki gibidir ve `DATABASE-DEPENDENCIES.md` ile aynıdır.
-11. Misafir sepeti yalnızca PHP session'da; carts yalnızca üye sepeti (user_id NOT NULL).
+11. Misafir sepeti yalnızca PHP session'da tutulur (`$_SESSION['cart']['items']`).
+`carts` ve `cart_items` tabloları yalnızca üye sepeti içindir; `carts.user_id` NOT NULL'dır.
+Giriş yapıldığında misafir sepeti `CartService::mergeGuestCart()` ile üye sepetine birleştirilir.
 12. Migration çalıştırıcı: schema_migrations'a checksum kaydeder; çalışmış dosya değişirse durur.
 13. **Yetkilendirme:** Oturumda yalnızca kullanıcı ID'si tutulur (`_auth_user_id`); rol ve durum her istekte DB'den okunur, pasifleştirilen kullanıcı hemen düşer. Panel erişimi `admin` ve `staff`, tam yönetici yetkisi yalnızca `admin`.
 14. **Kullanıcı oluşturma:** `User::create()` kapalıdır; `user_type` hiçbir zaman form girdisinden alınmaz.
@@ -170,6 +183,22 @@ Bekleyen migration yazımı yok (001–018 yazıldı). Bekleyen iş: 010–018'i
 38. **Kategori/marka görseli:** `Uploader` ile (`categories`, `brands` klasörleri). Yeni dosya DB hatasında silinir; eski dosya yalnızca başarılı güncellemeden sonra silinir. Formlarda `enctype="multipart/form-data"` vardır.
 39. **Sepet:** misafir sepeti yalnızca session'da, üye sepeti DB'de (DECISIONS.md). Kalem anahtarı misafirde `p5`/`p5v3`, üyede `cart_items.id`. Sepete ekleme/güncellemede stok, varyant ve vitrin görünürlüğü denetlenir; varyantlı üründe varyant zorunludur. Fiyat bilgilendirmedir, sipariş anında yeniden hesaplanır. Sepette en fazla 50 kalem, kalem başına en fazla 1000 adet.
 40. **Sepet birleştirme:** girişte `CartService::mergeGuestCart()`; aynı ürün+varyantta adetler toplanır, stoğa sığmayan kalem eklenmez ve uyarı döner, ardından session sepeti temizlenir.
+41. **Sepet route'ları:** `/sepet`, `/sepet/ozet`, `/sepet/ekle`, `/sepet/guncelle` ve `/sepet/sil` route'ları admin grubunun dışındadır; misafir kullanıcılar da sepeti kullanabilir. POST isteklerinde genel CSRF denetimi geçerlidir.
+
+42. **Sepet görünümü:** Sepet sayfası sunucuda render edilir; adet değiştirme ve kalem silme Fetch API ile yapılır. Bildirimler Bootstrap alert alanına `textContent` ile yazılır; `innerHTML` kullanılmaz.
+
+43. **Sepet anahtarı doğrulaması:** `CartController` içindeki `KEY_PATTERN` regex'i Validator'a dizi biçiminde verilir; çünkü desen `|` içerir ve metin kuralı `|` ile bölünür.
+
+44. **Vitrin ürün listesi:** `/urunler` sayfası arama, kategori, fiyat aralığı, sıralama ve sayfalama destekler. Geçersiz filtreler sayfayı kırmaz; kullanıcıya uyarı gösterilir. `min > max` ise her iki fiyat filtresi yok sayılır.
+
+45. **Vitrin sıralaması:** Kullanıcıdan gelen sıralama değeri doğrudan SQL'e konmaz; yalnızca `new`, `price_asc`, `price_desc` ve `name` değerleri sabit eşlemeyle kullanılır.
+
+46. **Ürün detay:** `/urun/{slug}` yalnızca vitrinde görünebilir ürünleri açar. Varyantlı üründe fiyat ve stok varyant bazlıdır; varyant seçilmeden sepete ekleme yapılamaz.
+
+47. **Vitrin controller ayrımı:** Müşteri tarafı `App\Controllers\ProductController`, yönetim tarafı `App\Controllers\Admin\ProductController` olur. `App.php` içinde vitrin controller'ı `StorefrontProductController` takma adıyla kullanılır.
+
+48. **Görüntülenme sayacı:** Ürün detayı her açılışta `view_count` değerini artırır. Bot/yenileme filtresi şu aşamada uygulanmaz; gerekirse sonradan oturum bazlı sayım eklenir.
+
 
 ## 8. Bilinen Riskler
 
@@ -235,7 +264,7 @@ Bekleyen migration yazımı yok (001–018 yazıldı). Bekleyen iş: 010–018'i
 - 2026-10-31 (varyant modeli, controller, route'lar ve liste view'ı yazıldı; yalnızca `php -l` çalıştırıldı, veritabanı ve tarayıcı testi yapılmadı).
 - 2026-10-31 (görsel, varyant formu, Auth taşıma, stok modülü yazıldı; `php -l` ve elle test çalıştırılmadı).
 - 2026-11-01 (dashboard, başlangıç stoğu hareketi, kategori/marka görseli, Cart modeli, CartService, CartController yazıldı; `php -l` ve elle test çalıştırılmadı).
-
+- 2026-11-01 (sepet view/JS/route'ları, vitrin Product modeli, vitrin ProductController, products/index, products/show ve vitrin route'ları yazıldı; php -l ve elle test henüz çalıştırılmadı).
 
 ## Teknik Kararlar
 

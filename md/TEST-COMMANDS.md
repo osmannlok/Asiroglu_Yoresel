@@ -63,6 +63,14 @@ php -l app/Views/admin/stock/history.php
 php -l app/Models/Cart.php
 php -l app/Services/CartService.php
 php -l app/Controllers/CartController.php
+php -l app/Models/Cart.php
+php -l app/Controllers/CartController.php
+php -l app/Views/cart/index.php
+php -l app/Core/App.php
+php -l app/Models/Product.php
+php -l app/Controllers/ProductController.php
+php -l app/Views/products/index.php
+php -l app/Views/products/show.php
 
 ### Tüm PHP dosyalarını tek seferde tara
 
@@ -173,3 +181,14 @@ git rm --cached <dosya>
 5. CSRF başlığı olmadan POST → 419 (JSON).
 6. Üye (giriş yapılınca): sepet `carts`/`cart_items` içinde tutulmalı; başka kullanıcının kalem ID'siyle güncelle/sil (404).
 7. Birleştirme (müşteri girişi yazıldığında): misafir sepeti girişte üye sepetine eklenmeli, adetler toplanmalı, stoğa sığmayan kalem uyarı vermeli, session sepeti temizlenmeli.
+- `GET /sepet` boş sepet görünümünü döndürmeli.
+- `GET /sepet/ozet` JSON dönmeli: `{"success":true,"count":0,...}`.
+- `POST /sepet/ekle` CSRF başlığı olmadan 419 dönmeli.
+- `POST /sepet/guncelle` için `key=p5v3` veya `key=12` kabul edilmeli; `key=abc` 422 dönmeli.
+- Ürün listesinde arama, kategori, fiyat, sıralama ve sayfalama çalışmalı.
+- `?min=850,50` gibi virgüllü fiyat reddedilmeli; ondalık ayırıcı nokta olmalı.
+- `?sirala=gecersiz` uyarı göstermeli ve varsayılan sıralamaya dönmeli.
+- `/urun/olmayan-slug` ve geçersiz slug 404 dönmeli.
+- Pasif ürün, pasif kategori veya pasif markadaki ürün vitrinde görünmemeli.
+- Varyantlı üründe varyant seçilmeden “Sepete Ekle” kilitli kalmalı.
+- Stoksuz varyant seçilemez; stoktan fazla adet istenirse 422 dönmeli.
