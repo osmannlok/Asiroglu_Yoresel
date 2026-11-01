@@ -9,10 +9,13 @@
  * ikinci bir savunma katmanı olarak yetki yeniden kontrol edilir; route
  * yanlışlıkla korumasız bırakılsa bile panel içeriği açılmaz.
  *
- * Şimdilik yalnızca kategori ve marka sayıları gösterilir. Ürün, sipariş
- * ve stok özetleri ilgili modeller yazıldığında eklenecektir.
+ * Gösterilenler: kategori, marka ve ürün sayıları ile kritik stok listesi.
+ * Sipariş özetleri ilgili modeller yazıldığında eklenecektir.
  *
- * Gereksinimler: FR-090, FR-091.
+ * Not: Kritik stok listesi yalnızca varyantsız ürünleri kapsar; varyantlı
+ * ürünlerin stoğu varyant düzeyinde izlenir (Product::getLowStock()).
+ *
+ * Gereksinimler: FR-024, FR-090, FR-091, FR-097.
  */
 
 declare(strict_types=1);
@@ -26,9 +29,13 @@ use App\Core\Response;
 use App\Middleware\AdminMiddleware;
 use App\Models\Brand;
 use App\Models\Category;
+use App\Models\Product;
 
 final class DashboardController extends Controller
 {
+    /** Kritik stok listesinde gösterilecek en fazla ürün */
+    private const LOW_STOCK_LIMIT = 10;
+
     /**
      * Genel bakış sayfası: GET /admin
      *
@@ -41,7 +48,8 @@ final class DashboardController extends Controller
             return $this->redirect(AdminMiddleware::LOGIN_PATH);
         }
 
-        $user = Auth::user();
+        $user     = Auth::user();
+        $products = new Product();
 
         return $this->view(
             'admin/dashboard/index',
@@ -52,7 +60,10 @@ final class DashboardController extends Controller
                 'stats'      => [
                     'categories' => (new Category())->count(),
                     'brands'     => (new Brand())->count(),
+                    'products'   => $products->count(),
                 ],
+                'lowStock'   => $products->getLowStock(self::LOW_STOCK_LIMIT),
+                'stockPath'  => '/admin/stok',
             ],
             'layouts/admin'
         );

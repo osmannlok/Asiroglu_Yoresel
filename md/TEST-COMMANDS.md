@@ -60,6 +60,9 @@ php -l app/Controllers/Admin/StockController.php
 php -l app/Views/admin/stock/index.php
 php -l app/Views/admin/stock/form.php
 php -l app/Views/admin/stock/history.php
+php -l app/Models/Cart.php
+php -l app/Services/CartService.php
+php -l app/Controllers/CartController.php
 
 ### Tüm PHP dosyalarını tek seferde tara
 
@@ -156,3 +159,17 @@ git rm --cached <dosya>
    - Varyantlı ürüne varyantsız hareket (reddedilmeli, form listesinde zaten çıkmaz)
    - Geçmiş filtresi ve sayfalamada filtrenin korunması
 10. CSRF'siz POST → 419
+11. Dashboard: `/admin` üç sayaç kartı (kategori, marka, ürün) göstermeli; eşik altı stoklu ürün "Kritik stok" tablosunda görünmeli, stok 0 olan "Tükendi" rozetiyle.
+12. Başlangıç stoğu: stok 10 ile yeni ürün ve stok 20 ile yeni varyant ekle; `/admin/stok/gecmis` içinde `0 → 10` ve `0 → 20` giriş kayıtları (kaynak: product/variant) görünmeli. Stok 0 ile eklemede kayıt oluşmamalı.
+13. Kategori görseli / marka logosu: JPG yükle, değiştir (eski dosya `public/uploads/categories|brands/` altından kalkmalı), "kaldır" işaretle; `.php` uzantılı dosya reddedilmeli.
+
+
+## Elle Test: Sepet (migration 011 uygulandıktan sonra)
+
+1. Misafir: `POST /sepet/ekle` (Fetch) ile ürün ekle; `GET /sepet/ozet` adedi ve toplamı vermeli; veritabanında `carts`/`cart_items` kaydı AÇILMAMALI.
+2. Aynı ürün+varyantı tekrar ekle: adet artmalı, yeni kalem açılmamalı.
+3. Stoktan fazla adet (reddedilmeli, "Yetersiz stok" mesajı); stok 0 ürün (reddedilmeli); varyantlı üründe varyantsız ekleme (reddedilmeli); pasif varyant (reddedilmeli).
+4. Adet güncelle (`quantity` = 0 kalemi silmeli); geçersiz `key` (422).
+5. CSRF başlığı olmadan POST → 419 (JSON).
+6. Üye (giriş yapılınca): sepet `carts`/`cart_items` içinde tutulmalı; başka kullanıcının kalem ID'siyle güncelle/sil (404).
+7. Birleştirme (müşteri girişi yazıldığında): misafir sepeti girişte üye sepetine eklenmeli, adetler toplanmalı, stoğa sığmayan kalem uyarı vermeli, session sepeti temizlenmeli.

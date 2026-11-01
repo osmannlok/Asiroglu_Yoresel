@@ -40,14 +40,16 @@ $invalid = static fn (string $key): string => isset($errors[$key]) ? ' is-invali
 $error = static fn (string $key): string => isset($errors[$key]) ? (string) $errors[$key] : '';
 
 $isActive = !empty($values['is_active']);
+$currentLogo = isset($currentLogo) ? (string) $currentLogo : '';
 ?>
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h1 class="h3 fw-bold mb-0"><?= $isEdit ? 'Markayı Düzenle' : 'Yeni Marka' ?></h1>
     <a href="<?= $this->e($this->url($listPath)) ?>" class="btn btn-outline-secondary">Listeye Dön</a>
 </div>
 
-<form id="brandForm" method="post" action="<?= $this->e($this->url($formAction)) ?>" novalidate>
-    <?= $this->csrfField() ?>
+<form id="brandForm" method="post" enctype="multipart/form-data"
+      action="<?= $this->e($this->url($formAction)) ?>" novalidate>
+<?= $this->csrfField() ?>
 
     <div class="row g-4">
         <div class="col-12 col-lg-8">
@@ -115,6 +117,38 @@ $isActive = !empty($values['is_active']);
                     </div>
                     <div class="form-text">
                         Pasif markanın ürünleri vitrinde listelenmez; sipariş geçmişi etkilenmez.
+                    </div>
+                </div>
+
+            </div>
+                        <div class="card border-0 shadow-sm mt-4">
+                <div class="card-body p-4">
+                    <h2 class="h5 fw-semibold mb-3">Logo</h2>
+
+                    <?php if ($currentLogo !== ''): ?>
+                        <div class="ratio ratio-4x3 bg-light mb-3">
+                            <img src="<?= $this->e($this->url('/uploads/' . $currentLogo)) ?>"
+                                 alt="<?= $this->e($val('name')) ?>"
+                                 class="object-fit-contain" loading="lazy">
+                        </div>
+
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="remove_logo"
+                                   name="remove_logo" value="1">
+                            <label class="form-check-label" for="remove_logo">Mevcut logoyu kaldır</label>
+                        </div>
+                    <?php endif; ?>
+
+                    <label for="logo" class="form-label">
+                        <?= $currentLogo !== '' ? 'Logoyu değiştir' : 'Logo yükle' ?>
+                    </label>
+                    <input type="file" class="form-control<?= $invalid('logo') ?>" id="logo" name="logo"
+                           accept="image/jpeg,image/png,image/webp" aria-describedby="logoHelp">
+                    <?php if ($error('logo') !== ''): ?>
+                        <div class="invalid-feedback"><?= $this->e($error('logo')) ?></div>
+                    <?php endif; ?>
+                    <div id="logoHelp" class="form-text">
+                        JPG, PNG veya WebP; en fazla 2 MB ve 6000x6000 piksel.
                     </div>
                 </div>
             </div>

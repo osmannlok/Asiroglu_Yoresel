@@ -61,6 +61,8 @@ ashiroglu-market/
 │       ├── categories/
 │       └── banners/
 ├── app/
+│   ├── Services/
+│   │   └── CartService.php
 │   ├── Core/
 │   │   ├── App.php
 │   │   ├── Router.php
@@ -343,12 +345,12 @@ Claude aşağıdaki sırayı takip edecektir:
 
 1. MVC çekirdek altyapısı (tamamlandı)
 2. Veritabanı migration dosyaları (001–018 tamamlandı)
-3. Kategori ve marka yönetimi (tamamlandı; görsel/logo alanları Uploader ile sonra eklenecek)
+3. Kategori ve marka yönetimi (tamamlandı; görsel/logo dahil)
 4. Ürün yönetimi (model, controller, liste ve form view'ları tamamlandı)
 5. Ürün görselleri ve varyantlar (tamamlandı)
-6. Stok yönetimi (model, controller, view'lar tamamlandı; route ve menü bekliyor)
-7. Admin paneli
-8. Sepet modülü
+6. Stok yönetimi (tamamlandı)
+7. Admin paneli (dashboard tamamlandı)
+8. Sepet modülü (model, servis, controller yazıldı; view ve route bekliyor)
 9. Sipariş modülü
 10. Ödeme entegrasyonu
 11. Kargo ve iade yönetimi

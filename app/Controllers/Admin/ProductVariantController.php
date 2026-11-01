@@ -39,6 +39,7 @@ use App\Core\Validator;
 use App\Middleware\AdminMiddleware;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\StockMovement;
 use InvalidArgumentException;
 use PDOException;
 use RuntimeException;
@@ -352,11 +353,29 @@ final class ProductVariantController extends Controller
 
         try {
             if ($variantId === null) {
-                // product_id ve başlangıç stoğu yalnızca oluşturmada yazılır
+                // product_id yalnızca oluşturmada yazılır; başlangıç stoğu hareket kaydıyla girilir
+                $initialStock          = (int) ($data['stock_quantity'] ?? 0);
                 $row['product_id']     = $productId;
-                $row['stock_quantity'] = (int) ($data['stock_quantity'] ?? 0);
+                $row['stock_quantity'] = 0;
 
-                $variants->create($row);
+                // Varyant ve başlangıç stok hareketi aynı transaction içinde yazılır
+                $variants->transaction(function () use ($variants, $row, $initialStock, $productId): void {
+                    $newId = $variants->create($row);
+
+                    if ($initialStock > 0) {
+                        (new StockMovement())->record(
+                            $productId,
+                            $newId,
+                            'incoming',
+                            $initialStock,
+                            'Başlangıç stoğu',
+                            Auth::id(),
+                            'variant',
+                            $newId
+                        );
+                    }
+                });
+
                 Session::flash('success', 'Varyant eklendi.');
             } else {
                 // product_id ve stock_quantity bilinçli olarak yazılmaz.

@@ -117,6 +117,12 @@ Misafir sepeti yalnızca PHP session içinde tutulacaktır.
   önce (2026-10-31) bu karara göre düzeltildi; ALTER TABLE gerekmedi.
 - Uygulandı: 011 migration'ında (2026-10-31).
 
+- Sepete ekleme ve adet güncellemede (misafir ve üye) stok, varyant ve vitrin görünürlüğü denetlenir; varyantlı üründe varyant seçimi zorunludur.
+- Sepet kalemi anahtarı: misafirde `p{ürün}` / `p{ürün}v{varyant}`, üyede `cart_items.id`.
+- Sepette en fazla 50 farklı kalem, kalem başına en fazla 1000 adet.
+- Sepetteki fiyat bilgilendirme amaçlıdır; sipariş oluşturulurken güncel fiyat ve stokla yeniden kontrol edilir.
+- Birleştirme `CartService::mergeGuestCart()` ile yapılır; stoğa sığmayan kalem eklenmez ve kullanıcıya uyarı olarak bildirilir.
+
 ## Ödeme ve Kargo İlişkileri
 
 - payments.order_id için UNIQUE eklenmez.
@@ -195,6 +201,7 @@ Misafir sepeti yalnızca PHP session içinde tutulacaktır.
   - correction türünde girilen değer hedef stoktur; kaydedilen quantity farkın mutlak değeridir.
   - Formdan yalnızca incoming, outgoing, return, correction kabul edilir; reservation sistem kaynaklıdır.
   - Varyantı olan ürüne varyantsız hareket yazılamaz.
+  - Ürün veya varyant oluşturulurken başlangıç stoğu doğrudan yazılmaz; kayıt 0 stokla açılır ve başlangıç stoğu > 0 ise `incoming` hareketi aynı transaction içinde yazılır.
 
   ## Görsel Yükleme Kuralları
 
@@ -205,3 +212,4 @@ Misafir sepeti yalnızca PHP session içinde tutulacaktır.
   - Üründe tek ana görsel; ilk görsel otomatik ana olur.
   - Ürün başına en fazla 10 görsel yüklenebilir.
   - Kayıt başarısız olursa o istekte yüklenen dosyalar silinir; görsel silinirken önce DB kaydı, sonra dosya kaldırılır.
+  - Kategori görseli ve marka logosu da Uploader ile yüklenir (klasörler: categories, brands); formlarda enctype="multipart/form-data" kullanılır.

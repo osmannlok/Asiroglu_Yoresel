@@ -50,7 +50,16 @@
 - [x] `App.php` düzeltildi: çift `use` satırları ve çift `sil` route'u kaldırıldı
 - [x] `Auth.php` `app/Core/` altına taşındı; `AuthMiddleware.php` kopyası silindi
 - [x] Stok modülü yazıldı: `Models/StockMovement.php`, `Admin/StockController.php`, `admin/stock/{index,form,history}.php`
-- [ ] Stok route'ları `App.php`'ye ve "Stok" menü satırı `layouts/admin.php`'ye eklenecek
+- [x] Stok route'ları `App.php`'ye ve "Stok" menüsü `layouts/admin.php`'ye eklendi
+- [x] Dashboard: `DashboardController` ve `admin/dashboard/index.php` güncellendi (ürün sayısı, kritik stok tablosu, FR-097)
+- [x] `ProductController` ve `ProductVariantController`: başlangıç stoğu > 0 ise `stock_movements` kaydı (aynı transaction)
+- [x] Kategori görseli (`CategoryController`, `admin/categories/form.php`) ve marka logosu (`BrandController`, `admin/brands/form.php`) eklendi
+- [x] Sepet modülü başladı: `Models/Cart.php`, `Services/CartService.php`, `Controllers/CartController.php` yazıldı
+- [ ] `Cart.php` içinde `resolveSellable()` ve `assertQuantity()` `public` yapılmalı (CartService kullanıyor)
+- [ ] `CartController`: `update()` ve `remove()` içindeki `regex` kuralı dizi biçimine çevrilmeli (desen `|` içeriyor)
+- [ ] `cart/index` view'ı, sepet JS'i ve `/sepet*` route'ları (`App.php`) yazılacak
+- [ ] Migration 011'in `migrate.php` ile gerçek MySQL'de çalıştırılması
+
 
 ## 3. Oluşturulan Migration Dosyaları
 
@@ -100,15 +109,19 @@ Toplam: 18 migration dosyası, 31 uygulama tablosu (schema_migrations hariç).
 - `StockMovement`: yalnızca eklenir (`create/update/delete` kapalı); `record()` stok güncelleme ve hareketi aynı transaction'da, `FOR UPDATE` ile yapar; `paginate`, `getStockItems`
 - `Admin\StockController`: `index`, `create`, `store`, `history`
 - View: `admin/products/images/index`, `admin/products/variants/form`, `admin/stock/{index,form,history}`
+- `Cart`: yalnızca üye sepeti (`carts`, `cart_items`); `findActiveByUser`, `getOrCreateActive`, `getItems`, `countQuantity`, `addItem` (aynı ürün+varyantta adet artar, transaction + `FOR UPDATE`), `setQuantity` (0 siler), `removeItem`, `clear`, `getTotals`; `create/update/delete` kapalı; stok, varyant ve vitrin görünürlüğü kontrolü `resolveSellable()` içinde
+- `Services\CartService`: misafir (`$_SESSION['cart']['items']`) ve üye sepetini tek arayüzde toplar; `summary`, `count`, `items`, `add`, `setQuantity`, `remove`, `mergeGuestCart` (giriş sonrası birleştirme; sığmayan kalem uyarı olarak döner)
+- `CartController`: `index`, `summary`, `add`, `update`, `remove` (JSON, Fetch); servis hataları 422 ile döner
+
 
 ## 5. Sıradaki Dosya
 
-1. `App.php` stok route'ları + `layouts/admin.php` stok menüsü
-2. `DashboardController` ve dashboard view: ürün sayısı, kritik stok kartı (FR-097, `Product::getLowStock()`)
-3. Ürün oluşturma ve varyant oluşturmada başlangıç stoğu için `stock_movements` kaydı
-4. Kategori/marka formlarına görsel/logo alanı
+1. `app/Views/cart/index.php` ve sepet JS'i
+2. `App.php`: `CartController` `use` satırı ve 5 `/sepet*` route'u (admin grubunun dışında)
+3. Ürün listeleme ve ürün detay sayfası (vitrin, "Sepete ekle" butonu, varyant seçimi)
+4. Müşteri kayıt/giriş (girişte `CartService::mergeGuestCart()` çağrılacak)
 5. Doğrulama turu: `php -l` (tümü) ve elle test
-6. Sepet modülü
+6. Sipariş modülü
 
 ## 6. Bekleyen Migration Dosyaları
 
@@ -153,6 +166,10 @@ Bekleyen migration yazımı yok (001–018 yazıldı). Bekleyen iş: 010–018'i
 34. **Ürün görselleri:** ürün başına en fazla 10 görsel. DB kaydı başarısız olursa yüklenen dosyalar silinir. Silmede önce kayıt, sonra dosya kaldırılır. Sıralama Yukarı/Aşağı butonları ve Fetch ile yapılır.
 35. **Stok hareketleri:** `stock_movements` yalnızca eklenir. Stok güncelleme ve hareket kaydı aynı transaction'da, satır `FOR UPDATE` ile kilitlenerek yapılır. Stok negatife düşemez. Manuel harekette işlem nedeni zorunludur (FR-026). `correction` türünde girilen değer hedef stoktur; kaydedilen miktar farkın mutlak değeridir. Formdan yalnızca `incoming`, `outgoing`, `return`, `correction` kabul edilir; `reservation` sistem kaynaklıdır.
 36. **Kalem seçimi:** stok formunda kalem `p{ürün}` veya `p{ürün}v{varyant}` biçimindedir. Varyantlı ürüne varyantsız hareket yazılamaz.
+37. **Başlangıç stoğu:** ürün veya varyant oluşturulurken stok doğrudan yazılmaz; kayıt 0 stokla açılır ve başlangıç stoğu > 0 ise `incoming` hareketi (`reference_type` = `product`/`variant`) aynı transaction'da yazılır.
+38. **Kategori/marka görseli:** `Uploader` ile (`categories`, `brands` klasörleri). Yeni dosya DB hatasında silinir; eski dosya yalnızca başarılı güncellemeden sonra silinir. Formlarda `enctype="multipart/form-data"` vardır.
+39. **Sepet:** misafir sepeti yalnızca session'da, üye sepeti DB'de (DECISIONS.md). Kalem anahtarı misafirde `p5`/`p5v3`, üyede `cart_items.id`. Sepete ekleme/güncellemede stok, varyant ve vitrin görünürlüğü denetlenir; varyantlı üründe varyant zorunludur. Fiyat bilgilendirmedir, sipariş anında yeniden hesaplanır. Sepette en fazla 50 kalem, kalem başına en fazla 1000 adet.
+40. **Sepet birleştirme:** girişte `CartService::mergeGuestCart()`; aynı ürün+varyantta adetler toplanır, stoğa sığmayan kalem eklenmez ve uyarı döner, ardından session sepeti temizlenir.
 
 ## 8. Bilinen Riskler
 
@@ -171,10 +188,16 @@ Bekleyen migration yazımı yok (001–018 yazıldı). Bekleyen iş: 010–018'i
 
 ### Orta
 
+- `CartController::update()`/`remove()` içinde `regex:` kuralı `|` içeren desenle yazıldı; Validator kuralı `|` ile böldüğü için dizi biçimine çevrilmeli.
+- `Cart::resolveSellable()` ve `assertQuantity()` `public` yapılmalı (CartService çağırıyor).
+- Misafir sepetindeki fiyat her görüntülemede güncel hesaplanır; sepete eklendiği anki fiyat saklanmaz (üyede saklanır). Sipariş anında yeniden kontrol edileceği için kabul edildi.
+- `CartService::GUEST_KEY_PATTERN` sabiti kullanılmıyor; silinebilir.
+- Migration 011 gerçek MySQL'de henüz çalıştırılmadı; sepet bu yüzden test edilemez.
+- Marka ve kategori listelerinde görsel/logo küçük resmi gösterilmiyor.
 - `StockController::store()` model hata mesajını anahtar kelimeyle `quantity`/`item` alanına eşliyor; mesajlar değişirse eşleme bozulur. İleride özel exception sınıfı kullanılmalı.
 - `admin/stock/index.php` içinde `const STOCK_LIST_LIMIT` view içinde tanımlı; değişkene çevrilmeli.
 - `ProductImage::addImage()` closure + `parent::create()` kalıbı ve `StockMovement::record()` aynı kalıbı kullanıyor; ilk çalıştırmada doğrulanmalı.
-- Başlangıç stoğu için `stock_movements` kaydı atılmıyor (`StockMovement` modeli yok). Stok modülünde, ürün oluşturma akışına eklenecek.StockMovement yazıldı; ürün ve varyant oluşturma akışlarına hareket kaydı eklenmeli
+
 - FR-021 varyant başına kritik stok eşiği istiyor; migration 007'de bu sütun yok. Karar 33'e göre ürünün eşiği kullanılıyor, migration 019 açılmadı. `Product::getLowStock()` yalnızca varyantsız ürünleri kapsıyor; varyantlı ürünlerin kritik stok listesi stok modülünde ele alınmalı.
 - Varyant oluşturulurken girilen başlangıç stoğu için `stock_movements` kaydı atılmıyor (`StockMovement` modeli yok). Ürün başlangıç stoğuyla aynı sorun; stok modülünde birlikte çözülecek.
 - WebP yüklemesi için sunucuda GD/WebP desteği gerekir; yoksa "geçerli görsel değil" hatası verir.
@@ -211,6 +234,8 @@ Bekleyen migration yazımı yok (001–018 yazıldı). Bekleyen iş: 010–018'i
 - 2026-10-31 (ürün modülü, Uploader ve ProductImage yazıldı; php -l ve elle test çalıştırılmadı).
 - 2026-10-31 (varyant modeli, controller, route'lar ve liste view'ı yazıldı; yalnızca `php -l` çalıştırıldı, veritabanı ve tarayıcı testi yapılmadı).
 - 2026-10-31 (görsel, varyant formu, Auth taşıma, stok modülü yazıldı; `php -l` ve elle test çalıştırılmadı).
+- 2026-11-01 (dashboard, başlangıç stoğu hareketi, kategori/marka görseli, Cart modeli, CartService, CartController yazıldı; `php -l` ve elle test çalıştırılmadı).
+
 
 ## Teknik Kararlar
 

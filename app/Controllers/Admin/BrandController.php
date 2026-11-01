@@ -34,6 +34,7 @@ use App\Core\Request;
 use App\Core\Response;
 use App\Core\Session;
 use App\Core\Validator;
+use App\Core\Uploader;
 use App\Middleware\AdminMiddleware;
 use App\Models\Brand;
 use PDOException;
@@ -52,6 +53,9 @@ final class BrandController extends Controller
 
     /** MySQL "yinelenen kayıt" hata kodu (UNIQUE ihlali) */
     private const MYSQL_DUPLICATE_ENTRY = 1062;
+    /** Uploader hedef klasörü ve formdaki dosya alanı */
+    private const UPLOAD_FOLDER = 'brands';
+    private const FILE_FIELD    = 'logo';
 
     /** Slug üretiminde Türkçe karakter karşılıkları */
     private const TURKISH_MAP = [
@@ -272,11 +276,32 @@ final class BrandController extends Controller
             return $this->backWithErrors($input, $errors, $id, $request);
         }
 
+                // --- Logo: yükleme / kaldırma -----------------------------------------
+        $existing  = $id === null ? null : $brands->find($id);
+        $oldLogo   = $existing === null ? '' : (string) ($existing['logo'] ?? '');
+        $newLogo   = null;      // bu istekte yüklenen yeni dosya
+        $logoValue = $oldLogo !== '' ? $oldLogo : null;
+
+        $file = $request->file(self::FILE_FIELD);
+
+        if ($file !== null && ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            try {
+                $newLogo   = Uploader::save($file, self::UPLOAD_FOLDER);
+                $logoValue = $newLogo;
+            } catch (RuntimeException $e) {
+                // Uploader mesajları kullanıcıya gösterilebilir Türkçe mesajlardır
+                return $this->backWithErrors($input, ['logo' => $e->getMessage()], $id, $request);
+            }
+        } elseif ($this->checkbox($request, 'remove_logo')) {
+            $logoValue = null;
+        }
+
         $row = [
             'name'        => (string) $data['name'],
             'slug'        => $slug,
             'description' => $data['description'] ?? null,
             'website'     => $data['website'] ?? null,
+            'logo'        => $logoValue,
             'is_active'   => $this->checkbox($request, 'is_active') ? 1 : 0,
         ];
 
@@ -290,6 +315,8 @@ final class BrandController extends Controller
                 Session::flash('success', 'Marka güncellendi.');
             }
         } catch (RuntimeException $e) {
+            $this->discardUpload($newLogo);
+
             // Eşzamanlı istekte slug çakışması: UNIQUE ihlali alan hatası olarak döner
             $previous = $e->getPrevious();
 
@@ -306,6 +333,11 @@ final class BrandController extends Controller
             }
 
             throw $e;
+        }
+
+        // Kayıt başarılı: logo değiştirildi veya kaldırıldıysa eski dosya silinir
+        if ($oldLogo !== '' && $oldLogo !== $logoValue) {
+            Uploader::delete($oldLogo);
         }
 
         return $this->redirect(self::LIST_PATH);
@@ -360,6 +392,7 @@ final class BrandController extends Controller
                 'activeMenu' => 'brands',
                 'isEdit'     => $id !== null,
                 'brandId'    => $id,
+                'currentLogo' => $brand === null ? '' : (string) ($brand['logo'] ?? ''),
                 'values'     => $values,
                 'errors'     => is_array($errors) ? $errors : [],
                 'formAction' => $id === null
@@ -420,6 +453,16 @@ final class BrandController extends Controller
         $value = $request->input($name);
 
         return in_array($value, ['1', 'on', 'true', 1, true], true);
+    }
+
+        /**
+     * Bu istekte yüklenen ama kayda yazılamayan dosyayı siler (sahipsiz dosya kalmasın).
+     */
+    private function discardUpload(?string $path): void
+    {
+        if ($path !== null) {
+            Uploader::delete($path);
+        }
     }
 
     /**

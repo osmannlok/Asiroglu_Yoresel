@@ -36,6 +36,7 @@ use App\Core\Session;
 use App\Core\Validator;
 use App\Middleware\AdminMiddleware;
 use App\Models\Category;
+use App\Core\Uploader;
 use InvalidArgumentException;
 use PDOException;
 use RuntimeException;
@@ -53,7 +54,9 @@ final class CategoryController extends Controller
 
     /** MySQL "yinelenen kayıt" hata kodu (UNIQUE ihlali) */
     private const MYSQL_DUPLICATE_ENTRY = 1062;
-
+    /** Uploader hedef klasörü ve formdaki dosya alanı */
+    private const UPLOAD_FOLDER = 'categories';
+    private const FILE_FIELD    = 'image';
     /** Slug üretiminde Türkçe karakter karşılıkları */
     private const TURKISH_MAP = [
         'ç' => 'c', 'Ç' => 'c',
@@ -304,12 +307,33 @@ final class CategoryController extends Controller
             return $this->backWithErrors($input, $errors, $id, $request);
         }
 
+        // --- Görsel: yükleme / kaldırma ---------------------------------------
+        $existing   = $id === null ? null : $categories->find($id);
+        $oldImage   = $existing === null ? '' : (string) ($existing['image'] ?? '');
+        $newImage   = null;      // bu istekte yüklenen yeni dosya
+        $imageValue = $oldImage !== '' ? $oldImage : null;
+
+        $file = $request->file(self::FILE_FIELD);
+
+        if ($file !== null && ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            try {
+                $newImage   = Uploader::save($file, self::UPLOAD_FOLDER);
+                $imageValue = $newImage;
+            } catch (RuntimeException $e) {
+                // Uploader mesajları kullanıcıya gösterilebilir Türkçe mesajlardır
+                return $this->backWithErrors($input, ['image' => $e->getMessage()], $id, $request);
+            }
+        } elseif ($this->checkbox($request, 'remove_image')) {
+            $imageValue = null;
+        }
+
         $row = [
             'parent_id'        => $parentId,
             'name'             => (string) $data['name'],
             'slug'             => $slug,
             'description'      => $data['description'] ?? null,
             'icon'             => $data['icon'] ?? null,
+            'image'            => $imageValue,
             'meta_title'       => $data['meta_title'] ?? null,
             'meta_description' => $data['meta_description'] ?? null,
             'sort_order'       => (int) ($data['sort_order'] ?? 0),
@@ -327,9 +351,13 @@ final class CategoryController extends Controller
                 Session::flash('success', 'Kategori güncellendi.');
             }
         } catch (InvalidArgumentException $e) {
+            $this->discardUpload($newImage);
+
             // Model döngü kontrolü (yarış durumuna karşı ikinci kontrol)
             return $this->backWithErrors($input, ['parent_id' => $e->getMessage()], $id, $request);
         } catch (RuntimeException $e) {
+            $this->discardUpload($newImage);
+
             // Eşzamanlı istekte slug çakışması: UNIQUE ihlali kullanıcıya alan hatası olarak döner
             $previous = $e->getPrevious();
 
@@ -346,6 +374,11 @@ final class CategoryController extends Controller
             }
 
             throw $e;
+        }
+
+        // Kayıt başarılı: görsel değiştirildi veya kaldırıldıysa eski dosya silinir
+        if ($oldImage !== '' && $oldImage !== $imageValue) {
+            Uploader::delete($oldImage);
         }
 
         return $this->redirect(self::LIST_PATH);
@@ -409,6 +442,7 @@ final class CategoryController extends Controller
                 'activeMenu' => 'categories',
                 'isEdit'     => $id !== null,
                 'categoryId' => $id,
+                'currentImage' => $category === null ? '' : (string) ($category['image'] ?? ''),
                 'values'     => $values,
                 'errors'     => is_array($errors) ? $errors : [],
                 'parents'    => $this->parentOptions($categories, $id),
@@ -494,6 +528,16 @@ final class CategoryController extends Controller
         $value = $request->input($name);
 
         return in_array($value, ['1', 'on', 'true', 1, true], true);
+    }
+
+        /**
+     * Bu istekte yüklenen ama kayda yazılamayan dosyayı siler (sahipsiz dosya kalmasın).
+     */
+    private function discardUpload(?string $path): void
+    {
+        if ($path !== null) {
+            Uploader::delete($path);
+        }
     }
 
     /**

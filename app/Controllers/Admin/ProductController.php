@@ -41,6 +41,7 @@ use App\Middleware\AdminMiddleware;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\StockMovement;
 use InvalidArgumentException;
 use PDOException;
 use RuntimeException;
@@ -444,10 +445,28 @@ final class ProductController extends Controller
 
         try {
             if ($id === null) {
-                // Başlangıç stoğu yalnızca oluşturmada yazılır
-                $row['stock_quantity'] = (int) ($data['stock_quantity'] ?? 0);
+                // Başlangıç stoğu ürün satırına doğrudan yazılmaz; hareket kaydıyla girilir
+                $initialStock          = (int) ($data['stock_quantity'] ?? 0);
+                $row['stock_quantity'] = 0;
 
-                $products->create($row);
+                // Ürün ve başlangıç stok hareketi aynı transaction içinde yazılır
+                $products->transaction(function () use ($products, $row, $initialStock): void {
+                    $newId = $products->create($row);
+
+                    if ($initialStock > 0) {
+                        (new StockMovement())->record(
+                            $newId,
+                            null,
+                            'incoming',
+                            $initialStock,
+                            'Başlangıç stoğu',
+                            Auth::id(),
+                            'product',
+                            $newId
+                        );
+                    }
+                });
+
                 Session::flash('success', 'Ürün eklendi.');
             } else {
                 // stock_quantity bilinçli olarak yazılmaz (stok modülünden yönetilir).
