@@ -66,6 +66,12 @@
 - [x] `app/Views/products/index.php` yazıldı: filtre formu, ürün kartları, sayfalama, Fetch ile sepete ekleme ve “Tükendi” durumu.
 - [x] `app/Views/products/show.php` yazıldı: galeri, varyant seçimi, dinamik fiyat/stok güncelleme, miktar seçimi, Fetch ile sepete ekleme ve benzer ürünler.
 - [x] `App.php`: `use App\Controllers\ProductController as StorefrontProductController;` ve vitrin route'ları eklendi: `GET /urunler`, `GET /urun/{slug:[a-z0-9]+(?:-[a-z0-9]+)*}`.
+- [x] `layouts/main.php`: menüye Ürünler, Sepet (rozetli), ürün arama formu, oturum durumuna göre Giriş / Kayıt Ol / ad + Çıkış ve staff için "Yönetim Paneli" bağlantısı eklendi (2026-11-01)
+- [x] `CartService::GUEST_KEY_PATTERN` kullanılmayan sabiti silindi
+- [x] Müşteri kimlik doğrulama modülü yazıldı: `Controllers/AuthController.php` (vitrin), `Views/auth/login.php`, `Views/auth/register.php`; 5 route `App.php`'de (`GET/POST /giris`, `GET/POST /kayit`, `POST /cikis`; `StorefrontAuthController` takma adı)
+- [x] Girişte ve kayıtta `CartService::mergeGuestCart()` bağlandı (FR-041)
+- [ ] 2026-11-01 tarihli yeni dosyalarda `php -l` ve elle test çalıştırılmadı: `layouts/main.php`, `AuthController.php`, `auth/login.php`, `auth/register.php`, `App.php`, `CartService.php`
+
 
 ## 3. Oluşturulan Migration Dosyaları
 
@@ -123,16 +129,21 @@ Toplam: 18 migration dosyası, 31 uygulama tablosu (schema_migrations hariç).
 - `Views/products/index`: filtre formu, ürün kartı ızgarası, sayfalama, Fetch ile sepete ekleme.
 - `Views/products/show`: galeri, varyant seçimi, dinamik fiyat/stok, adet ve Fetch ile sepete ekleme.
 - `Views/cart/index`: sepet sayfası; Fetch ile adet güncelleme, kalem silme ve `/sepet/ozet` senkronizasyonu.
+- `Controllers\AuthController` (vitrin, `App\Controllers`): `showLogin`, `login`, `showRegister`, `register`, `logout`. Kayıtta `user_type` her zaman `customer` olur. Başarısız girişte mesaj hesap bilgisi sızdırmaz. `next` yalnızca güvenli site içi yollarla sınırlıdır. Giriş ve kayıttan sonra misafir sepeti birleştirilir; birleştirme hatası girişi engellemez, loglanır.
+- `Views/auth/login`: e-posta, şifre, gizli `next`; şifre geri doldurulmaz.
+- `Views/auth/register`: ad, soyad, e-posta, telefon, şifre, şifre tekrarı; alan bazlı hatalar.
+- `Views/layouts/main`: sepet rozeti ilk açılışta `CartService::count()` ile hesaplanır. `window.fetch` sarmalayıcısı `/sepet/` altına yapılan başarılı POST yanıtındaki `count` değerini rozete yazar. Geri tuşuyla dönüşte (`pageshow`) rozet `/sepet/ozet` ile tazelenir.
+
+
 
 ## 5. Sıradaki Dosya
 
 
-1. `app/Views/layouts/main.php`: menüye “Ürünler” ve “Sepet” bağlantıları, `/sepet/ozet` ile güncellenen sepet rozeti.
-2. `CartService::GUEST_KEY_PATTERN` kullanılmayan sabitinin silinmesi.
-3. Migration 011’in `migrate.php` ile gerçek MySQL’de çalıştırılması ve sepetin elle test edilmesi.
-4. Müşteri kayıt/giriş modülü; giriş sonrası `CartService::mergeGuestCart()` çağrılacak.
-5. Doğrulama turu: tüm yeni dosyalar için `php -l`, ardından tarayıcı/veritabanı testleri.
-6. Sipariş modülü.
+1. Doğrulama turu (kullanıcı adımı): `php database/migrate.php --status`, ardından `php database/migrate.php`. Sonra tüm dosyalar için `php -l` ve sepet, vitrin, müşteri girişi için elle test (TEST-COMMANDS.md).
+2. Sipariş modülü: `app/Models/Order.php` (sipariş numarası `ASY-YYYYMMDD-NNNNNN`, transaction içinde stok düşme, kupon kullanımı, durum geçmişi). Ardından `OrderItem`/servis, `CheckoutController` ve checkout view'ları.
+3. Müşteri hesabı sayfaları: profil, adres defteri, siparişlerim (FR-053, FR-054, FR-055).
+4. Şifremi unuttum (FR-052) ve e-posta doğrulaması (FR-051).
+5. Kupon modeli ve admin kupon yönetimi.
 
 ## 6. Bekleyen Migration Dosyaları
 
@@ -198,6 +209,13 @@ Giriş yapıldığında misafir sepeti `CartService::mergeGuestCart()` ile üye 
 47. **Vitrin controller ayrımı:** Müşteri tarafı `App\Controllers\ProductController`, yönetim tarafı `App\Controllers\Admin\ProductController` olur. `App.php` içinde vitrin controller'ı `StorefrontProductController` takma adıyla kullanılır.
 
 48. **Görüntülenme sayacı:** Ürün detayı her açılışta `view_count` değerini artırır. Bot/yenileme filtresi şu aşamada uygulanmaz; gerekirse sonradan oturum bazlı sayım eklenir.
+49. **Müşteri route'ları:** `/giris`, `/kayit`, `/cikis` herkese açıktır ve admin grubunun dışındadır. Yönetim paneli girişi ayrıdır: `/admin/giris`, `/admin/cikis`. `App.php`'de vitrin sınıfı `StorefrontAuthController` takma adıyla kullanılır.
+50. **Kayıt:** `user_type` hiçbir zaman formdan alınmaz; `User::createUser()` varsayılanı `customer`'dır. Şifre kuralı: en az 8 karakter, harf ve rakam, en fazla 72 bayt. Şifre hiçbir zaman flash'a yazılmaz.
+51. **Giriş sonrası sepet:** Giriş ve kayıttan sonra `CartService::mergeGuestCart()` çağrılır. Hata girişi engellemez, loglanır ve session sepeti korunur. Sığmayan kalemler `info` flash'ı olarak gösterilir.
+52. **Dönüş adresi (`next`):** Yalnızca `/` ile başlayan, sabit karakter kümesine uyan, `//` ve `..` içermeyen yollar kabul edilir. `/giris`, `/kayit`, `/cikis` kabul edilmez (döngü).
+53. **Menü ve sepet rozeti:** Sepet rozeti ilk açılışta sunucuda, sonrasında Fetch yanıtlarındaki `count` ile güncellenir. Menüde gizleme yetki kontrolü değildir; asıl denetim route ve middleware katmanındadır.
+54. **Admin ve vitrin oturumu:** Oturum anahtarı (`_auth_user_id`) ortaktır; admin/staff kullanıcı vitrin `/giris` üzerinden de oturum açabilir. Müşteri hesabı `/admin/giris` ile panele giremez. Kısıtlama istenirse ayrı karar olur.
+
 
 
 ## 8. Bilinen Riskler
@@ -217,10 +235,8 @@ Giriş yapıldığında misafir sepeti `CartService::mergeGuestCart()` ile üye 
 
 ### Orta
 
-- `CartController::update()`/`remove()` içinde `regex:` kuralı `|` içeren desenle yazıldı; Validator kuralı `|` ile böldüğü için dizi biçimine çevrilmeli.
-- `Cart::resolveSellable()` ve `assertQuantity()` `public` yapılmalı (CartService çağırıyor).
+
 - Misafir sepetindeki fiyat her görüntülemede güncel hesaplanır; sepete eklendiği anki fiyat saklanmaz (üyede saklanır). Sipariş anında yeniden kontrol edileceği için kabul edildi.
-- `CartService::GUEST_KEY_PATTERN` sabiti kullanılmıyor; silinebilir.
 - Migration 011 gerçek MySQL'de henüz çalıştırılmadı; sepet bu yüzden test edilemez.
 - Marka ve kategori listelerinde görsel/logo küçük resmi gösterilmiyor.
 - `StockController::store()` model hata mesajını anahtar kelimeyle `quantity`/`item` alanına eşliyor; mesajlar değişirse eşleme bozulur. İleride özel exception sınıfı kullanılmalı.
@@ -244,6 +260,14 @@ Giriş yapıldığında misafir sepeti `CartService::mergeGuestCart()` ile üye 
 - `Request::ip()` proxy veya Cloudflare arkasında yanlış IP verir. Admin rate limiting'den önce çözülmeli.
 - Yeni dosyalarda `php -l` ve geçici test betikleri çalıştırılmadı; `tmp_*.php` dosyaları işiniz bitince silinmeli (özellikle `tmp_create_admin.php`).
 - `Router::normalizePath()` artık ardışık `/` karakterlerini tek `/` yapıyor; `/admin//x` ile `/admin/x` aynı route'a eşleşir.
+- Müşteri girişinde ve kayıtta brute-force koruması (rate limiting) yok; `Request::ip()` proxy düzeltmesine bağlı. Admin girişiyle aynı teknik borç: sunucu internete açılmadan çözülmeli.
+- E-posta doğrulaması (FR-051) ve şifremi unuttum (FR-052) yok. Kayıtta e-posta doğrulanmadığı için başkasının adresiyle hesap açılabilir.
+- `layouts/main.php` `$_GET['q']` ve `$_SERVER['REQUEST_URI']` okuyor (yalnızca gösterim ve menü işaretleme). Temiz çözüm: controller'dan `$searchQuery` ve `$currentPath` geçirmek.
+- `layouts/main.php` içindeki `$isGuestPage` satırı geçici bir ifade içeriyor (`$currentPathForAuth` atamasıyla). `$currentPath` tanımından sonraya taşınıp `in_array($currentPath, ['/giris', '/kayit'], true)` biçimine sadeleştirilmeli.
+- `layouts/main.php` `window.fetch`'i sarar ve `/sepet/` içeren her POST'u izler. Sepet dışında bu yol parçasını kullanan bir modül eklenirse gözden geçirilmeli. `count` alanı yoksa etkisizdir.
+- Vitrin sayfalarında `Hesabım` (profil, adresler, siparişler) henüz yok; menüdeki ad bağlantı değildir.
+- Kayıtta telefon boşluk, tire ve parantezden arındırılarak saklanır (`users.phone VARCHAR(20)`). Uluslararası biçimler (`+90 ...`) 20 karakteri aşmamalı; Validator `phone` kuralı yalnızca Türkiye cep numaralarını kabul eder.
+
 
 
 ### Düşük
@@ -265,6 +289,8 @@ Giriş yapıldığında misafir sepeti `CartService::mergeGuestCart()` ile üye 
 - 2026-10-31 (görsel, varyant formu, Auth taşıma, stok modülü yazıldı; `php -l` ve elle test çalıştırılmadı).
 - 2026-11-01 (dashboard, başlangıç stoğu hareketi, kategori/marka görseli, Cart modeli, CartService, CartController yazıldı; `php -l` ve elle test çalıştırılmadı).
 - 2026-11-01 (sepet view/JS/route'ları, vitrin Product modeli, vitrin ProductController, products/index, products/show ve vitrin route'ları yazıldı; php -l ve elle test henüz çalıştırılmadı).
+- 2026-11-01 (vitrin menüsü, müşteri AuthController, login/register view'ları ve route'ları yazıldı; `php -l` ve elle test çalıştırılmadı).
+
 
 ## Teknik Kararlar
 

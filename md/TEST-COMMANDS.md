@@ -63,14 +63,16 @@ php -l app/Views/admin/stock/history.php
 php -l app/Models/Cart.php
 php -l app/Services/CartService.php
 php -l app/Controllers/CartController.php
-php -l app/Models/Cart.php
+php -l app/Services/CartService.php
 php -l app/Controllers/CartController.php
 php -l app/Views/cart/index.php
-php -l app/Core/App.php
-php -l app/Models/Product.php
 php -l app/Controllers/ProductController.php
 php -l app/Views/products/index.php
 php -l app/Views/products/show.php
+php -l app/Controllers/AuthController.php
+php -l app/Views/auth/login.php
+php -l app/Views/auth/register.php
+
 
 ### Tüm PHP dosyalarını tek seferde tara
 
@@ -82,6 +84,7 @@ bu dosya için sözdizimi kontrolü atlanır veya kullanıcı kendisi çalışt�
 ## Migration Kontrolü
 
 - Uygulanan migration'lar 001–018'dir (migrate.php yazıldı).
+- Sepet ve müşteri girişini elle test etmeden önce `php database/migrate.php --status` çıktısında 001–018'in hepsi `[uygulandı]` olmalı (`carts`/`cart_items` için 011 şart).
 
 
 ## Veritabanı Kontrolü
@@ -192,3 +195,24 @@ git rm --cached <dosya>
 - Pasif ürün, pasif kategori veya pasif markadaki ürün vitrinde görünmemeli.
 - Varyantlı üründe varyant seçilmeden “Sepete Ekle” kilitli kalmalı.
 - Stoksuz varyant seçilemez; stoktan fazla adet istenirse 422 dönmeli.
+
+## Elle Test: Vitrin Menüsü ve Müşteri Girişi
+
+1. Ziyaretçi: menüde "Ürünler", "Sepet", "Giriş", "Kayıt Ol" görünmeli; "Çıkış" ve "Yönetim Paneli" görünmemeli. Sepet rozeti 0 iken gizli olmalı.
+2. Rozet: `/urunler` içinde varyantsız ürünü sepete ekle, rozet sayfa yenilenmeden artmalı. `/sepet` içinde adet değiştir, rozet toplam adede eşitlenmeli. Son kalemi çıkar, rozet kaybolmalı. Geri tuşuyla önceki sayfaya dönünce rozet doğru adedi göstermeli.
+3. Üst arama kutusu: "fıstık" yazınca `/urunler?q=...` açılmalı, kutuda aranan metin görünmeli.
+4. Kayıt (`/kayit`):
+   - Boş gönderim: ad, soyad, e-posta, şifre hataları görünmeli; girilen değerler korunmalı, şifre alanları boş olmalı.
+   - Aynı e-posta ile ikinci kayıt: "zaten kayıtlı" hatası.
+   - `abc123` (kısa) ve `abcdefgh` (rakamsız): şifre hatası. Şifre ≠ tekrar: şifre alanında eşleşme hatası.
+   - Telefon `0532 123 45 67` kabul, `12345` reddedilmeli.
+   - Geçerli kayıt: ana sayfaya yönlenmeli, oturum açık olmalı; `users.user_type` değeri `customer` olmalı.
+5. Giriş (`/giris`):
+   - Yanlış şifre ve olmayan e-posta aynı mesajı vermeli: "E-posta veya şifre hatalı."; e-posta dolu, şifre boş kalmalı.
+   - Pasif/banlı kullanıcı aynı mesajı almalı.
+   - `/giris?next=/sepet` ile giriş: `/sepet`'e dönmeli. `?next=//evil.com`, `?next=/giris` ve `?next=https://evil.com` yok sayılıp `/`'a dönmeli.
+   - Oturum açıkken `/giris` ve `/kayit` ana sayfaya yönlendirmeli.
+6. Misafir sepeti birleştirme: misafirken sepete ürün ekle, sonra giriş yap veya kayıt ol. `cart_items`'a geçmeli, session sepeti boşalmalı, rozet aynı kalmalı. Üyenin sepetinde aynı ürün varsa adetler toplanmalı; stoğa sığmayan kalem için bilgi mesajı çıkmalı.
+7. Çıkış: menüdeki "Çıkış" butonu POST yapmalı, "Çıkış yaptınız." mesajı görünmeli. CSRF'siz `POST /cikis` → 419. `GET /cikis` → 405.
+8. Yetki: müşteri hesabıyla `/admin/giris` → "E-posta veya şifre hatalı."; müşteri oturumuyla `/admin` → 403. Admin/staff girişinden sonra menüde "Yönetim Paneli" görünmeli, müşteride görünmemeli.
+9. `POST /giris` ve `POST /kayit` CSRF'siz → 419.

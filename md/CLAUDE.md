@@ -120,6 +120,7 @@ ashiroglu-market/
 │   │   ├── layouts/
 │   │   ├── home/
 │   │   ├── products/
+│   │   ├── auth/
 │   │   ├── cart/
 │   │   ├── checkout/
 │   │   ├── account/
@@ -268,6 +269,8 @@ Giriş yapıldığında misafir sepeti `CartService::mergeGuestCart()` ile üye 
 - Şifre doğrulama `password_verify()` ile yapılacak.
 - Session cookie’lerinde `HttpOnly`, `Secure` ve `SameSite` ayarları kullanılacak.
 - Admin paneline yalnızca yetkili kullanıcılar erişebilecek.
+- Müşteri girişi/kaydı `/giris`, `/kayit`, `/cikis` route'larındadır; kayıtta `user_type` formdan alınmaz, giriş hata mesajı hesap bilgisi sızdırmaz, giriş sonrası dönüş adresi (`next`) yalnızca güvenli site içi yollarla sınırlıdır.
+- Müşteri girişinde rate limiting henüz yok (`Request::ip()` borcuna bağlı); sunucu internete açılmadan çözülmelidir.
 - Yetkilendirme `users.user_type` ENUM ile yönetilir: panel erişimi `admin` ve `staff`, tam yönetici yetkisi yalnızca `admin`. `roles` ve `permissions` tabloları şu aşamada yoktur.
 - Admin girişinde brute-force koruması için rate limiting uygulanacak.(henüz yok; Request::ip() proxy düzeltmesinden sonra. Bu çözülene kadar sunucu internete açılmaz.)
 - Dosya yüklemelerinde uzantı, MIME tipi, dosya boyutu ve gerçek içerik kontrolü yapılacak.
@@ -282,6 +285,7 @@ Giriş yapıldığında misafir sepeti `CartService::mergeGuestCart()` ile üye 
 
 - `Request::ip()` şu aşamada değiştirilmez. Proxy veya Cloudflare arkasına geçilince ayrı güvenlik görevi olarak çözülür ve admin rate limiting'den önce tamamlanmalıdır.
 - Güvenlik başlıkları, SRI ve 405 yanıtı düzeltmesi ayrı görevlerde yapılır.
+- E-posta doğrulaması (FR-051) ve şifre sıfırlama (FR-052) henüz yok.
 
 ## Admin Panel Kuralları
 
@@ -352,7 +356,7 @@ Claude aşağıdaki sırayı takip edecektir:
 5. Ürün görselleri ve varyantlar (tamamlandı)
 6. Stok yönetimi (tamamlandı)
 7. Admin paneli (dashboard tamamlandı)
-8. Sepet modülü (model, servis, controller yazıldı; view ve route bekliyor)
+8. Sepet modülü, vitrin ürün listesi/detayı ve müşteri giriş/kayıt (model, servis, controller, view ve route'lar yazıldı; gerçek MySQL ile elle test bekliyor)
 9. Sipariş modülü
 10. Ödeme entegrasyonu
 11. Kargo ve iade yönetimi

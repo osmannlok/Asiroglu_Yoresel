@@ -42,9 +42,6 @@ final class CartService
     /** Sepette bulunabilecek en fazla farklı kalem sayısı */
     private const MAX_ITEMS = 50;
 
-    /** Misafir kalem anahtarı biçimi: p5 veya p5v3 */
-    private const GUEST_KEY_PATTERN = '/^p([1-9]\d{0,9})(?:v([1-9]\d{0,9}))?$/';
-
     private Cart $cart;
 
     public function __construct(?Cart $cart = null)

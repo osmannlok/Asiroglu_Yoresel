@@ -19,6 +19,7 @@ use App\Controllers\Admin\ProductController;
 use App\Controllers\Admin\ProductImageController;
 use App\Controllers\Admin\ProductVariantController;
 use App\Controllers\Admin\StockController;
+use App\Controllers\AuthController as StorefrontAuthController;
 use App\Controllers\CartController;
 use App\Controllers\HomeController;
 use App\Controllers\ProductController as StorefrontProductController;
@@ -98,6 +99,15 @@ final class App
         // Herkese açıktır; yalnızca GET olduğu için CSRF gerekmez.
         $this->router->get('/urunler', [StorefrontProductController::class, 'index']);
         $this->router->get('/urun/{slug:[a-z0-9]+(?:-[a-z0-9]+)*}', [StorefrontProductController::class, 'show']);
+
+        // --- Müşteri girişi, kaydı ve çıkışı (FR-041, FR-050) ---------------
+        // Herkese açıktır. POST'ların CSRF doğrulaması handle() içinde yapılır.
+        // Yönetim paneli girişi ayrıdır: /admin/giris, /admin/cikis.
+        $this->router->get('/giris', [StorefrontAuthController::class, 'showLogin']);
+        $this->router->post('/giris', [StorefrontAuthController::class, 'login']);
+        $this->router->get('/kayit', [StorefrontAuthController::class, 'showRegister']);
+        $this->router->post('/kayit', [StorefrontAuthController::class, 'register']);
+        $this->router->post('/cikis', [StorefrontAuthController::class, 'logout']);
 
         // --- Sepet (FR-040, FR-042, FR-043, FR-044, FR-045) -----------------
         // Misafir de sepet kullanır; bu route'lar AdminMiddleware dışındadır.

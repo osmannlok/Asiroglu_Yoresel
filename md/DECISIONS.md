@@ -174,6 +174,8 @@ Misafir sepeti yalnızca PHP session içinde tutulacaktır.
 - Proxy veya Cloudflare arkasına geçildiğinde güvenilir proxy başlıkları ile IP tespiti yeniden değerlendirilir.
 - Proxy uyumu ayrı bir güvenlik görevi olarak planlanır ve admin rate limiting'den önce çözülmelidir.
 - Güvenlik başlıkları, SRI ve 405 yanıtı düzeltmesi ayrı görevlerde yapılır.
+- Müşteri girişi ve kaydı için rate limiting yoktur; admin rate limiting ile birlikte `Request::ip()` düzeltmesinden sonra ele alınır.
+- Layout, `$_GET['q']` ve `REQUEST_URI`'yi doğrudan okur; controller'dan değişken geçirmek ileride temizlenecektir.
 
 ## Yönetim Paneli Kuralları
 
@@ -213,3 +215,22 @@ Misafir sepeti yalnızca PHP session içinde tutulacaktır.
   - Ürün başına en fazla 10 görsel yüklenebilir.
   - Kayıt başarısız olursa o istekte yüklenen dosyalar silinir; görsel silinirken önce DB kaydı, sonra dosya kaldırılır.
   - Kategori görseli ve marka logosu da Uploader ile yüklenir (klasörler: categories, brands); formlarda enctype="multipart/form-data" kullanılır.
+
+  ## Müşteri Kimlik Doğrulama Kuralları
+
+- Müşteri route'ları: `GET/POST /giris`, `GET/POST /kayit`, `POST /cikis`. Admin girişinden (`/admin/giris`, `/admin/cikis`) ayrıdır ve `AdminMiddleware` dışındadır.
+- Kayıtta `user_type` formdan alınmaz; `User::createUser()` varsayılanı `customer` kullanılır.
+- Şifre: en az 8 karakter, en az bir harf ve bir rakam, en fazla 72 bayt. Giriş şifresi Validator'dan geçmez (boşluk anlamlıdır). Şifre flash'a ve loglara yazılmaz.
+- Başarısız girişte mesaj tektir: "E-posta veya şifre hatalı." Yanlış e-posta, yanlış şifre ve pasif/banlı hesap ayırt edilemez.
+- Giriş ve kayıttan sonra `Auth::login()` session ID ve CSRF token'ı yeniler (session fixation).
+- Giriş ve kayıttan sonra `CartService::mergeGuestCart()` çağrılır. Birleştirme hatası girişi engellemez; hata loglanır, session sepeti korunur. Sığmayan kalemler kullanıcıya bilgi mesajı olarak gösterilir.
+- Giriş sonrası dönüş adresi (`next`) yalnızca site içi, sabit karakter kümesine uyan yollarla sınırlıdır; `//`, `..`, `/giris`, `/kayit`, `/cikis` kabul edilmez.
+- Çıkış yalnızca POST ve CSRF korumalıdır.
+- Admin/staff kullanıcı vitrin girişinden de oturum açabilir (ortak oturum anahtarı). Müşteri hesabı admin paneline giremez.
+- E-posta doğrulaması (FR-051), şifre sıfırlama (FR-052) ve brute-force koruması bu aşamada yoktur; rate limiting `Request::ip()` düzeltmesine bağlıdır.
+
+## Vitrin Menüsü Kuralları
+
+- Ana layout menüsünde Ana Sayfa, Ürünler, arama formu (`GET /urunler?q=`), Sepet, ve oturum durumuna göre Giriş / Kayıt Ol veya ad / Çıkış bulunur. Staff kullanıcı için "Yönetim Paneli" bağlantısı gösterilir; menüde gizleme yetki kontrolü değildir.
+- Sepet rozeti ilk açılışta `CartService::count()` ile sunucuda hesaplanır; sayı veya oturum okunamazsa sayfa çökmez, rozet gizlenir ve hata loglanır.
+- Rozet sayfa yenilenmeden `/sepet/` altına yapılan başarılı POST yanıtlarındaki `count` değeriyle güncellenir.
