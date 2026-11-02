@@ -45,16 +45,6 @@
 - [x] `App.php`: `GET /hesabim/siparisler`, `GET /hesabim/siparisler/{id:\d+}` (AdminMiddleware dışı)
 - [x] `layouts/main.php`: üye menüsünde "Siparişlerim" bağlantısı (aktif işaretli)
 
-**Bekleyen test**
-- [ ] Yeni dosyalarda `php -l` + elle test (layouts/main, AuthController, auth views, App.php, CartService, Order)
-- [ ] Migration 011+ gerçek MySQL’de çalıştırma
-- [ ] `php -l`: ShippingMethod, CheckoutService, CheckoutController, checkout views, App.php, cart/index
-- [ ] Checkout elle test (TEST-COMMANDS.md); en az bir shipping_methods satırı gerekir
-<!-- YENİ -->
-- [ ] `php -l`: AccountOrderController, account/orders/index, account/orders/show, App.php, layouts/main
-- [ ] Hesabım siparişleri elle test: girişsiz yönlendirme + `next` dönüşü, kendi siparişi, başka kullanıcının ID'si ("Sipariş bulunamadı."), misafir siparişi üye listesinde görünmemeli, menüde aktif işaret
-
-- [~] Admin kargo yöntemi CRUD (FR-084, FR-085): `ShippingMethodController`, `admin/shipping/index.php`, `admin/shipping/form.php` yazıldı. Route ve menü bağlandı (`App.php`, `layouts/admin.php`); test edilmedi.
 
 ## 3. Migration’lar (001–018)
 
@@ -90,13 +80,15 @@
 | Order | place, changeStatus, sorgular (findForUser, paginateByUser Hesabım'da kullanılıyor) |
 | ShippingMethod | delete() kapalı → setActive(); calculateFee, remainingForFreeShipping |
 | CheckoutService | quote/validate/placeOrder; güncel fiyatla kargo hesabı; başarıdan sonra sepet boşalır |
+| Coupon | kupon doğrulama/kullanım; `used_count` transaction’da |
+| Payment | ödeme kaydı ve ödeme durumu işlemleri |
 
 **Uploader:** products|categories|brands|banners · finfo + getimagesize · rastgele ad
 
 ## 5. Sıradaki
 
-1. Coupon modeli + checkout/sipariş bağlama
-2. Payment modeli + PaymentGatewayInterface, kart/havale akışı
+1. `PaymentGatewayInterface.php` (sonraki dosya)
+2. Kart/havale ödeme akışı ve checkout/sipariş entegrasyonu
 3. Admin sipariş yönetimi, kargo takip no (shipments); tamamlanınca `account/orders/show.php`'ye kargo bloğu (FR-069)
 4. Hesabım profil/adres sayfaları (FR-053, FR-054)
 5. İade → E-posta → Raporlama
@@ -155,4 +147,4 @@ Tam liste → `DECISIONS.md`
 
 ## 8. Son Güncelleme
 
-2026-11-01 — vitrin menü, müşteri Auth, sepet, Order modeli; checkout (model, servis, controller, view, rotalar); Hesabım sipariş sayfaları (controller, 2 view, 2 route, menü bağlantısı). php -l + elle test bekliyor.
+2026-11-02 — `Coupon.php` ve `Payment.php` modelleri yazıldı. Sıradaki dosya: `PaymentGatewayInterface.php`. Yeni dosyaların `php -l` + elle testleri bekliyor.
