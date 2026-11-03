@@ -82,6 +82,7 @@
 | CheckoutService | quote/validate/placeOrder; güncel fiyatla kargo hesabı; başarıdan sonra sepet boşalır |
 | Coupon | kupon doğrulama/kullanım; `used_count` transaction’da |
 | Payment | ödeme kaydı ve ödeme durumu işlemleri |
+|Shipment | delete/create/update kapalı; createForOrder, markHandedToCargo, updateTracking, changeStatus (FOR UPDATE); getForCustomer (FR-069) satırı.
 
 **Uploader:** products|categories|brands|banners · finfo + getimagesize · rastgele ad
 
@@ -144,4 +145,4 @@ Tam liste → `DECISIONS.md`
 
 ## 8. Son Güncelleme
 
-2026-11-02 — `Coupon.php` ve `Payment.php` modelleri yazıldı. Sıradaki dosya: `PaymentGatewayInterface.php`. Yeni dosyaların `php -l` + elle testleri bekliyor.
+2026-11-03 — PaymentGatewayInterface.php, account/orders/show.php(FR-069), app/Models/Shipment.php, app/Controllers/AccountOrderController.php yazıldı. 
