@@ -87,10 +87,8 @@
 
 ## 5. Sıradaki
 
-1. Kart/havale ödeme akışı ve checkout/sipariş entegrasyonu
-2. Admin sipariş yönetimi, kargo takip no (shipments); tamamlanınca `account/orders/show.php`'ye kargo bloğu (FR-069)
-3. Hesabım profil/adres sayfaları (FR-053, FR-054)
-4. İade → E-posta → Raporlama
+1. Hesabım profil/adres sayfaları (FR-053, FR-054)
+2. İade → E-posta → Raporlama
 
 ## 6. Kritik Kararlar (özet)
 
